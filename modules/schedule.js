@@ -1,11 +1,11 @@
 /**
  * Schedule Module
- * Contains schedule data and schedule-related logic
+ * Contains template schedule data, revision resources, and schedule helper functions
  */
 
 import { appState } from './state.js';
 
-// Default modules data
+// Default modules data for MRCOG Jan 2026
 export const defaultModules = [
   { name: 'Anatomy', exam_weight: 10, subtopics: 13, color: '#3498db', completed: 0,
     subtopics_list: ['Kidneys, Ureters & Bladder', 'Nerve Injuries', 'Anterior Abdominal Wall', 'Pelvis & Foetal Skull', 'Vagina & Ovaries', 'Vulva', 'Intra-abdominal Organs', 'Perineum, Inguinal & Femoral Canal', 'Inguinal Region', 'Thigh', 'Wisdom Shots', 'Beginners Blueprint Videos', 'Concept Based Videos'] },
@@ -33,8 +33,115 @@ export const defaultModules = [
     subtopics_list: ['ABG Analysis', 'Clinical Governance', 'Haem Abnormalities', 'Urogynaecology', 'Biophysics', 'Spirometry', 'Wisdom Shots', 'Questions'] }
 ];
 
-// Default detailed schedule from draft/app.js
-export const defaultDetailedSchedule = {
+// Revision Resources for the MRCOG template
+export const templateRevisionResources = {
+  gtgPodcasts: [
+    'Management of Perineal Tear GTG 29',
+    'Management of Shoulder Dystocia',
+    'Red Cell Antibodies GTG 65',
+    'Premenopausal Ovarian Mass GTG 62',
+    'Bacterial Sepsis GTG 64',
+    'Postmenopausal Ovarian Cyst GTG 34'
+  ],
+  gtgSummaries: [
+    'Breech and ECV', 'Gestational Trophoblastic Disease', 'Endometriosis',
+    'Female Genital Mutilation', 'PCOS', 'Obstetric Cholestasis',
+    'Amniocentesis and CVS', 'Chickenpox in Pregnancy',
+    'Management of 3rd and 4th degree perineal tears', 'Assisted Vaginal Births',
+    'Bacterial Sepsis in Pregnancy', 'Thromboembolism Acute Management',
+    'Management of Endometrial Hyperplasia', 'Nausea and Vomiting in Pregnancy',
+    'Premenopausal Ovarian Masses', 'Rh Negative Management',
+    'Postmenopausal Ovarian Cyst', 'Shoulder Dystocia',
+    'Reducing risk of VTE in Pregnancy', 'Prevention and management of PPH'
+  ],
+  niceGuidelines: [
+    'Intrapartum Care', 'Diabetes in Pregnancy', 'Endometriosis',
+    'Heavy Menstrual Bleeding', 'Urinary Incontinence and Prolapse',
+    'Fertility Problems Assessment and Treatment'
+  ],
+  rrrSessions: {
+    'Jan2024': [
+      'Session 1: Pharmacology, Clinical Management',
+      'Session 2: Microbiology, Embryology',
+      'Session 3: Endocrinology',
+      'Session 4: Genetics, Biostatistics',
+      'Session 5: Biostatistics, Anatomy',
+      'Session 6: Anatomy',
+      'Session 7: Embryology',
+      'Session 8: Pathology',
+      'Session 9: Embryology 2'
+    ],
+    'Jul2024': [
+      'Session 1: Clinical Management, Pathology Cellular Adaptation',
+      'Session 2: Biostatistics, Genetics Pedigree Charts',
+      'Session 3: Endocrinology, Anatomy of Female Reproductive',
+      'Session 4: Data Interpretation, Biochemistry',
+      'Session 5: Anatomy, Biophysics (Lasers)',
+      'Session 6: Physiology, Biostatistics',
+      'Session 7: Microbiology, Clinical Management (CTG)',
+      'Session 8: Embryology, Data Interpretation',
+      'Session 9: Immunology, Embryology',
+      'Session 10: Genetics, Endocrinology (Adrenal & Pancreatic)',
+      'Session 11: Biophysics, Immunology (Adaptive/Innate)',
+      'Session 12: Pharmacology, Microbiology (Perinatal Infections)',
+      'Session 13: Biochemistry, Pharmacology (Antibiotics)',
+      'Session 14: Pathology, Physiology (Changes in Pregnancy)'
+    ]
+  }
+};
+
+// SBA Test Schedule for MRCOG Jan 2026 Template
+export const templateSBASchedule = {
+  '2025-11-01': ['Biostatistics SBA Day 1'],
+  '2025-11-02': ['Biostatistics SBA Day 2'],
+  '2025-11-03': ['Biostatistics SBA Day 3'],
+  '2025-11-04': ['Biostatistics SBA Day 4'],
+  '2025-11-06': ['Anatomy SBA Day 1'],
+  '2025-11-07': ['Anatomy SBA Day 2'],
+  '2025-11-08': ['Anatomy SBA Day 3'],
+  '2025-11-09': ['Anatomy SBA Day 4'],
+  '2025-11-10': ['Anatomy SBA Day 5'],
+  '2025-11-11': ['Anatomy SBA Day 6'],
+  '2025-11-12': ['Physiology SBA Day 1'],
+  '2025-11-13': ['Physiology SBA Day 2'],
+  '2025-11-14': ['Physiology SBA Day 3'],
+  '2025-11-15': ['Physiology SBA Day 4'],
+  '2025-11-16': ['Physiology SBA Day 5'],
+  '2025-11-17': ['Physiology SBA Day 6'],
+  '2025-11-18': ['Endocrinology SBA Day 1'],
+  '2025-11-19': ['Endocrinology SBA Day 2'],
+  '2025-11-20': ['Endocrinology SBA Day 3'],
+  '2025-11-21': ['Endocrinology SBA Day 4'],
+  '2025-11-22': ['Endocrinology SBA Day 5'],
+  '2025-11-23': ['Endocrinology SBA Day 6'],
+  '2025-11-24': ['Anatomy+Embryology SBA Day 1'],
+  '2025-11-25': ['Anatomy+Embryology SBA Day 2'],
+  '2025-11-26': ['Anatomy+Embryology SBA Day 3'],
+  '2025-11-27': ['Anatomy+Embryology SBA Day 4'],
+  '2025-11-28': ['Anatomy+Embryology SBA Day 5'],
+  '2025-11-29': ['Anatomy+Embryology SBA Day 6'],
+  '2025-11-30': ['Anatomy+Embryology SBA Day 7'],
+  '2025-12-01': ['Anatomy+Embryology SBA Day 8'],
+  '2025-12-02': ['Endocrinology+Pathology SBA Day 1'],
+  '2025-12-03': ['Endocrinology+Pathology SBA Day 2'],
+  '2025-12-04': ['Endocrinology+Pathology SBA Day 3'],
+  '2025-12-05': ['Endocrinology+Pathology SBA Day 4'],
+  '2025-12-06': ['Endocrinology+Pathology SBA Day 5'],
+  '2025-12-07': ['Endocrinology+Pathology SBA Day 6'],
+  '2025-12-08': ['Endocrinology+Pathology SBA Day 7'],
+  '2025-12-09': ['Endocrinology+Pathology SBA Day 8'],
+  '2025-12-10': ['Clinical+Data SBA Day 1'],
+  '2025-12-11': ['Clinical+Data SBA Day 2'],
+  '2025-12-12': ['Clinical+Data SBA Day 3'],
+  '2025-12-13': ['Clinical+Data SBA Day 4'],
+  '2025-12-14': ['Clinical+Data SBA Day 5'],
+  '2025-12-15': ['Clinical+Data SBA Day 6'],
+  '2025-12-16': ['Clinical+Data SBA Day 7'],
+  '2025-12-17': ['Clinical+Data SBA Day 8']
+};
+
+// Detailed day-by-day schedule for MRCOG Jan 2026 Template
+export const templateDetailedSchedule = {
   '2025-11-01': { topics: ['Biostatistics: Variables & Types'], type: 'work', resources: ['Lecture Summary', 'Telegram Q'] },
   '2025-11-02': { topics: ['Biostatistics: Study Design', 'Biostatistics: Hypothesis Testing', 'Biostatistics: Graphs'], type: 'off', resources: ['Lecture Summary', 'Podcast', 'Video', 'Course Questions', 'Telegram Q'] },
   '2025-11-03': { topics: ['Biostatistics: Study Design recap'], type: 'work', resources: ['Podcast', 'Telegram Q'] },
@@ -111,99 +218,49 @@ export const defaultDetailedSchedule = {
   '2026-01-13': { topics: ['Exam Eve - Mental preparation, minimal study'], type: 'exam-eve', resources: ['Optional light Telegram Q', 'Mental preparation', 'Avoid heavy material'] }
 };
 
-// Default SBA schedule
-export const defaultSBASchedule = {
-  '2025-11-01': ['Biostatistics SBA Day 1'],
-  '2025-11-02': ['Biostatistics SBA Day 2'],
-  '2025-11-03': ['Biostatistics SBA Day 3'],
-  '2025-11-04': ['Biostatistics SBA Day 4'],
-  '2025-11-06': ['Anatomy SBA Day 1'],
-  '2025-11-07': ['Anatomy SBA Day 2'],
-  '2025-11-08': ['Anatomy SBA Day 3'],
-  '2025-11-09': ['Anatomy SBA Day 4'],
-  '2025-11-10': ['Anatomy SBA Day 5'],
-  '2025-11-11': ['Anatomy SBA Day 6'],
-  '2025-11-12': ['Physiology SBA Day 1'],
-  '2025-11-13': ['Physiology SBA Day 2'],
-  '2025-11-14': ['Physiology SBA Day 3'],
-  '2025-11-15': ['Physiology SBA Day 4'],
-  '2025-11-16': ['Physiology SBA Day 5'],
-  '2025-11-17': ['Physiology SBA Day 6'],
-  '2025-11-18': ['Endocrinology SBA Day 1'],
-  '2025-11-19': ['Endocrinology SBA Day 2'],
-  '2025-11-20': ['Endocrinology SBA Day 3'],
-  '2025-11-21': ['Endocrinology SBA Day 4'],
-  '2025-11-22': ['Endocrinology SBA Day 5'],
-  '2025-11-23': ['Endocrinology SBA Day 6'],
-  '2025-11-24': ['Anatomy+Embryology SBA Day 1'],
-  '2025-11-25': ['Anatomy+Embryology SBA Day 2'],
-  '2025-11-26': ['Anatomy+Embryology SBA Day 3'],
-  '2025-11-27': ['Anatomy+Embryology SBA Day 4'],
-  '2025-11-28': ['Anatomy+Embryology SBA Day 5'],
-  '2025-11-29': ['Anatomy+Embryology SBA Day 6'],
-  '2025-11-30': ['Anatomy+Embryology SBA Day 7'],
-  '2025-12-01': ['Anatomy+Embryology SBA Day 8'],
-  '2025-12-02': ['Endocrinology+Pathology SBA Day 1'],
-  '2025-12-03': ['Endocrinology+Pathology SBA Day 2'],
-  '2025-12-04': ['Endocrinology+Pathology SBA Day 3'],
-  '2025-12-05': ['Endocrinology+Pathology SBA Day 4'],
-  '2025-12-06': ['Endocrinology+Pathology SBA Day 5'],
-  '2025-12-07': ['Endocrinology+Pathology SBA Day 6'],
-  '2025-12-08': ['Endocrinology+Pathology SBA Day 7'],
-  '2025-12-09': ['Endocrinology+Pathology SBA Day 8'],
-  '2025-12-10': ['Clinical+Data SBA Day 1'],
-  '2025-12-11': ['Clinical+Data SBA Day 2'],
-  '2025-12-12': ['Clinical+Data SBA Day 3'],
-  '2025-12-13': ['Clinical+Data SBA Day 4'],
-  '2025-12-14': ['Clinical+Data SBA Day 5'],
-  '2025-12-15': ['Clinical+Data SBA Day 6'],
-  '2025-12-16': ['Clinical+Data SBA Day 7'],
-  '2025-12-17': ['Clinical+Data SBA Day 8']
-};
-
-/**
- * Get schedule data for a specific date
- * @param {Date} date
- * @returns {Object}
- */
-export function getScheduleForDate(date) {
-  const dateStr = date.toISOString().split('T')[0];
-  return appState.dailySchedule[dateStr] || null;
+// Schedule Helper Functions
+export function formatDate(date) {
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-/**
- * Get day type for a date
- * @param {Date} date
- * @returns {string}
- */
+export function formatDateShort(date) {
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+export function formatDateISO(date) {
+  return date.toISOString().split('T')[0];
+}
+
+export function getDaysBetween(date1, date2) {
+  const diffTime = date2 - date1;
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
+export function getWeekStart(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(d.setDate(diff));
+}
+
+// Get day type for a date
 export function getDayType(date) {
-  const schedule = getScheduleForDate(date);
+  const dateStr = formatDateISO(date);
+  const schedule = appState.dailySchedule[dateStr] || templateDetailedSchedule[dateStr];
   return schedule ? schedule.type : 'off';
 }
 
-/**
- * Check if date is a work day
- * @param {Date} date
- * @returns {boolean}
- */
+// Check if date is a work day
 export function isWorkDay(date) {
   return getDayType(date) === 'work';
 }
 
-/**
- * Check if date is a revision day
- * @param {Date} date
- * @returns {boolean}
- */
+// Check if date is a revision day
 export function isRevisionDay(date) {
   return getDayType(date) === 'revision';
 }
 
-/**
- * Get work info text for a date
- * @param {Date} date
- * @returns {string}
- */
+// Get work info text for a date
 export function getWorkInfo(date) {
   const dayType = getDayType(date);
   
@@ -223,117 +280,53 @@ export function getWorkInfo(date) {
   return infoMap[dayType] || 'Regular study day';
 }
 
-/**
- * Update schedule for a specific date
- * @param {Date} date
- * @param {Object} scheduleData
- */
-export function updateScheduleForDate(date, scheduleData) {
-  const dateStr = date.toISOString().split('T')[0];
-  appState.dailySchedule[dateStr] = scheduleData;
-}
-
-/**
- * Get topics for a specific date
- * @param {Date} date
- * @returns {Array<string>}
- */
-export function getTopicsForDate(date) {
-  const schedule = getScheduleForDate(date);
-  return schedule ? schedule.topics : ['General Study Period'];
-}
-
-/**
- * Get modules for a date (legacy function for compatibility)
- * @param {Date} date
- * @returns {Array<string>}
- */
-export function getModulesForDate(date) {
+// Get revision resources for a given week
+export function getTemplateRevisionResourcesForWeek(date) {
   const month = date.getMonth();
   const day = date.getDate();
   
+  const resources = {
+    podcasts: [],
+    summaries: [],
+    nice: [],
+    rrr: []
+  };
+  
   if (month === 10) { // November
-    if (day >= 1 && day <= 9) return ['Biostatistics', 'Biochemistry', 'Biophysics'];
-    if (day >= 10 && day <= 19) return ['Biochemistry', 'Microbiology', 'Immunology'];
-    if (day >= 20) return ['Data Interpretation', 'Embryology', 'Endocrinology'];
-  }
-  if (month === 11) { // December
-    if (day >= 1 && day <= 2) return ['Data Interpretation', 'Embryology', 'Endocrinology'];
-    if (day >= 3 && day <= 13) return ['Endocrinology', 'Genetics', 'Immunology'];
-    if (day >= 14 && day <= 18) return ['Revision of all modules'];
-    if (day >= 19 && day <= 29) return ['Light review only'];
-    if (day >= 30) return ['Pathology', 'Pharmacology', 'Anatomy'];
-  }
-  if (month === 0 && date.getFullYear() === 2026) { // January 2026
-    if (day >= 1 && day <= 4) return ['Pathology', 'Pharmacology', 'Anatomy', 'Mock exams'];
-    if (day >= 5 && day <= 11) return ['Clinical Management', 'Data Interpretation', 'Final review'];
-    if (day >= 12 && day <= 13) return ['Rest and light revision'];
-  }
-  return ['General Review'];
-}
-
-/**
- * Find next available day of a specific type
- * @param {Date} currentDate
- * @param {Array<string>} types - Array of day types to search for (e.g., ['off', 'revision'])
- * @returns {string} - Date string in ISO format
- */
-export function findNextAvailableDay(currentDate, types = ['off', 'revision']) {
-  let nextDate = new Date(currentDate);
-  nextDate.setDate(nextDate.getDate() + 1);
-  
-  for (let i = 0; i < 30; i++) {
-    const dayType = getDayType(nextDate);
-    
-    if (types.includes(dayType)) {
-      return nextDate.toISOString().split('T')[0];
+    if (day >= 1 && day <= 9) {
+      resources.summaries = ['Clinical Governance basics'];
+      resources.rrr = ['RRR Jan 2024 Session 4: Biostatistics', 'RRR Jan 2024 Session 5: Biostatistics'];
+    } else if (day >= 10 && day <= 19) {
+      resources.summaries = ['Bacterial Sepsis in Pregnancy', 'Chickenpox in Pregnancy'];
+      resources.podcasts = ['Bacterial Sepsis GTG 64'];
+      resources.rrr = ['RRR Jan 2024 Session 2: Microbiology'];
+    } else if (day >= 20) {
+      resources.summaries = ['Amniocentesis and CVS'];
+      resources.rrr = ['RRR Jan 2024 Session 7: Embryology', 'RRR Jul 2024 Session 8: Embryology'];
     }
-    
-    nextDate.setDate(nextDate.getDate() + 1);
+  } else if (month === 11) { // December
+    if (day >= 1 && day <= 13) {
+      resources.summaries = ['PCOS', 'Endometriosis'];
+      resources.nice = ['Endometriosis'];
+      resources.rrr = ['RRR Jan 2024 Session 3: Endocrinology', 'RRR Jan 2024 Session 4: Genetics'];
+    } else if (day >= 14 && day <= 18) {
+      resources.podcasts = ['All GTG podcasts - comprehensive review'];
+      resources.summaries = ['Review all 20 GTG summaries'];
+      resources.nice = ['Review all NICE guidelines'];
+    }
+  } else if (month === 0 && date.getFullYear() === 2026) { // January
+    if (day >= 1 && day <= 4) {
+      resources.summaries = ['Female Genital Mutilation', 'Management of 3rd and 4th degree perineal tears'];
+      resources.podcasts = ['Management of Perineal Tear GTG 29'];
+      resources.rrr = ['RRR Jan 2024 Session 1: Pharmacology', 'RRR Jan 2024 Session 6: Anatomy'];
+    } else if (day >= 5 && day <= 11) {
+      resources.summaries = ['Management of Labour', 'Shoulder Dystocia', 'Assisted Vaginal Births', 'Prevention and management of PPH'];
+      resources.podcasts = ['Management of Shoulder Dystocia', 'Red Cell Antibodies GTG 65'];
+      resources.nice = ['Intrapartum Care', 'Diabetes in Pregnancy'];
+      resources.rrr = ['RRR Jan 2024 Session 1: Clinical Management', 'RRR Jul 2024 Session 7: CTG Interpretation'];
+    }
   }
   
-  // If no specific day type found, return next day
-  return nextDate.toISOString().split('T')[0];
-}
-
-/**
- * Format date to readable string
- * @param {Date} date
- * @returns {string}
- */
-export function formatDate(date) {
-  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-}
-
-/**
- * Format date to short string
- * @param {Date} date
- * @returns {string}
- */
-export function formatDateShort(date) {
-  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-}
-
-/**
- * Get days between two dates
- * @param {Date} date1
- * @param {Date} date2
- * @returns {number}
- */
-export function getDaysBetween(date1, date2) {
-  const diffTime = date2 - date1;
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-}
-
-/**
- * Get week start (Monday) for a given date
- * @param {Date} date
- * @returns {Date}
- */
-export function getWeekStart(date) {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust to Monday
-  return new Date(d.setDate(diff));
+  return resources;
 }
 

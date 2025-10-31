@@ -1,152 +1,81 @@
 /**
- * Progress Calculation Module
- * Handles all progress calculations for tasks and modules
+ * Progress Module
+ * Handles progress calculations for tasks, modules, SBA, and Telegram questions
  */
 
-import { appState } from './state.js';
+import { appState, getTasksForDate } from './state.js';
+import { formatDateISO } from './schedule.js';
+import { loadSBATests, loadTelegramQuestions } from './storage.js';
+
+// ============================================
+// Overall Progress
+// ============================================
 
 /**
- * Calculate overall progress (tasks completed vs total tasks)
- * Only counts tasks up to and including today
+ * Calculate overall progress (only counts tasks up to today)
  * @returns {Object} { completed, total, percentage }
  */
 export function calculateOverallProgress() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
-  let completed = 0;
-  let total = 0;
+  let totalTasks = 0;
+  let completedTasks = 0;
   
-  // Iterate through all tasks
-  Object.keys(appState.tasks).forEach(dateKey => {
-    const taskDate = new Date(dateKey);
+  Object.keys(appState.tasks).forEach(dateStr => {
+    const taskDate = new Date(dateStr);
     taskDate.setHours(0, 0, 0, 0);
     
-    // Only count tasks up to today
+    // Only count tasks up to and including today
     if (taskDate <= today) {
-      const tasksForDate = appState.tasks[dateKey];
-      
-      if (tasksForDate && typeof tasksForDate === 'object') {
-        Object.keys(tasksForDate).forEach(taskKey => {
-          total++;
-          if (tasksForDate[taskKey] === true) {
-            completed++;
-          }
-        });
-      }
+      const categories = appState.tasks[dateStr] || [];
+      categories.forEach(cat => {
+        const tasksInCategory = cat.tasks || [];
+        totalTasks += tasksInCategory.length;
+        completedTasks += tasksInCategory.filter(t => t.completed).length;
+      });
     }
   });
+
+  const percentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
   
-  const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
-  
-  return { completed, total, percentage };
+  return { completed: completedTasks, total: totalTasks, percentage };
 }
 
-/**
- * Extract module name from topic/task text
- * E.g., "Anatomy: Kidneys" -> "Anatomy"
- * @param {string} text
- * @returns {string|null}
- */
-function extractModuleName(text) {
-  if (!text) return null;
-  
-  // Check if text contains a colon (module: topic format)
-  if (text.includes(':')) {
-    const parts = text.split(':');
-    return parts[0].trim();
-  }
-  
-  // Check if text matches a known module name
-  const knownModules = [
-    'Anatomy', 'Genetics', 'Physiology', 'Endocrinology', 'Biochemistry',
-    'Embryology', 'Microbiology', 'Immunology', 'Pathology', 'Pharmacology',
-    'Clinical Management', 'Biostatistics', 'Data Interpretation'
-  ];
-  
-  for (const moduleName of knownModules) {
-    if (text.includes(moduleName)) {
-      return moduleName === 'Microbiology' || text.includes('Immunology') 
-        ? 'Microbiology & Immunology' 
-        : moduleName;
-    }
-  }
-  
-  return null;
-}
+// ============================================
+// Module Progress
+// ============================================
 
 /**
- * Calculate progress for a specific module
- * Based on completed tasks that belong to this module
- * @param {string} moduleName
- * @returns {Object} { completed, total, percentage }
+ * Get module progress stats (combines task completion + manual subtopics)
+ * @param {Object} module - Module object with id, subtopics, completed
+ * @param {Object} stats - Task stats for the module
+ * @returns {Object} Combined progress info
  */
-export function calculateModuleProgress(moduleName) {
-  let completed = 0;
-  let total = 0;
+export function calculateModuleProgress(module, stats) {
+  // Calculate manual subtopic progress
+  const manualProgress = module.subtopics > 0 ?
+    Math.round((module.completed / module.subtopics) * 100) : 0;
   
-  // Iterate through all tasks
-  Object.keys(appState.tasks).forEach(dateKey => {
-    const tasksForDate = appState.tasks[dateKey];
-    
-    if (tasksForDate && typeof tasksForDate === 'object') {
-      // Get schedule for this date to find topics
-      const schedule = appState.dailySchedule[dateKey];
-      
-      if (schedule && schedule.topics) {
-        // Check if any topic in this date belongs to this module
-        const hasModuleTopics = schedule.topics.some(topic => {
-          const extracted = extractModuleName(topic);
-          return extracted === moduleName || 
-                 (moduleName === 'Microbiology & Immunology' && 
-                  (extracted === 'Microbiology' || extracted === 'Immunology'));
-        });
-        
-        if (hasModuleTopics) {
-          // Count tasks for this date
-          Object.keys(tasksForDate).forEach(taskKey => {
-            total++;
-            if (tasksForDate[taskKey] === true) {
-              completed++;
-            }
-          });
-        }
-      }
-    }
-  });
+  // Calculate task-based progress
+  const taskProgress = stats.totalTasks > 0 ?
+    Math.round((stats.completedTasks / stats.totalTasks) * 100) : 0;
   
-  const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
-  
-  return { completed, total, percentage };
+  // Combined progress: average of both if tasks exist, otherwise use manual only
+  const combinedProgress = stats.totalTasks > 0 ?
+    Math.round((manualProgress + taskProgress) / 2) : manualProgress;
+
+  return {
+    manualProgress,
+    taskProgress,
+    combinedProgress,
+    ...stats
+  };
 }
 
-/**
- * Update all module progress in the state
- * This updates the completed count for each module based on task completion
- */
-export function updateAllModuleProgress() {
-  if (!appState.modules || appState.modules.length === 0) {
-    return;
-  }
-  
-  appState.modules.forEach(module => {
-    const progress = calculateModuleProgress(module.name);
-    
-    // Update the module's completed count based on percentage of subtopics
-    if (module.subtopics) {
-      module.completed = Math.round((progress.percentage / 100) * module.subtopics);
-    }
-  });
-}
-
-/**
- * Get module by name
- * @param {string} moduleName
- * @returns {Object|null}
- */
-export function getModuleByName(moduleName) {
-  return appState.modules.find(m => m.name === moduleName) || null;
-}
+// ============================================
+// SBA Progress
+// ============================================
 
 /**
  * Calculate SBA progress
@@ -175,6 +104,70 @@ export function calculateSBAProgress() {
 }
 
 /**
+ * Update SBA header stats
+ * @param {string} userId - User ID
+ * @returns {Promise<Object>} SBA stats
+ */
+export async function updateSBAHeaderStats(userId) {
+  try {
+    const tests = await loadSBATests(userId);
+    const totalCompleted = tests.reduce((sum, test) => sum + test.completed, 0);
+    const totalDays = tests.reduce((sum, test) => sum + test.total_days, 0);
+    const percentage = totalDays > 0 ? Math.round((totalCompleted / totalDays) * 100) : 0;
+    
+    return { completed: totalCompleted, total: totalDays, percentage };
+  } catch (error) {
+    console.error('Error updating SBA header stats:', error);
+    return { completed: 0, total: 0, percentage: 0 };
+  }
+}
+
+// ============================================
+// Telegram Progress
+// ============================================
+
+/**
+ * Calculate Telegram questions progress
+ * @returns {number} Number of completed questions
+ */
+export function calculateTelegramProgress() {
+  let completed = 0;
+  
+  // Count all telegram questions
+  Object.keys(appState.telegramQuestions).forEach(dateKey => {
+    const questions = appState.telegramQuestions[dateKey];
+    if (Array.isArray(questions)) {
+      completed += questions.filter(q => q.completed && !q.is_placeholder).length;
+    }
+  });
+  
+  return completed;
+}
+
+/**
+ * Update Telegram header stats
+ * @param {string} userId - User ID
+ * @returns {Promise<number>} Number of completed questions
+ */
+export async function updateTelegramHeaderStats(userId) {
+  try {
+    const startDate = new Date('2025-01-01');
+    const endDate = new Date('2026-12-31');
+    const questions = await loadTelegramQuestions(userId, startDate, endDate);
+    const completed = questions.filter(q => q.completed && !q.is_placeholder).length;
+    
+    return completed;
+  } catch (error) {
+    console.error('Error updating Telegram header stats:', error);
+    return 0;
+  }
+}
+
+// ============================================
+// Catch-up Queue Stats
+// ============================================
+
+/**
  * Calculate catch-up queue stats
  * @returns {Object} { total, overdue }
  */
@@ -184,31 +177,11 @@ export function calculateCatchUpStats() {
   today.setHours(0, 0, 0, 0);
   
   const overdue = appState.catchUpQueue.filter(item => {
-    const itemDate = new Date(item.newDate);
+    const itemDate = new Date(item.new_date);
     itemDate.setHours(0, 0, 0, 0);
     return itemDate < today;
   }).length;
   
   return { total, overdue };
-}
-
-/**
- * Get completion status for all modules
- * @returns {Array} Array of modules with their completion stats
- */
-export function getAllModulesProgress() {
-  return appState.modules.map(module => {
-    const progress = calculateModuleProgress(module.name);
-    return {
-      name: module.name,
-      color: module.color,
-      examWeight: module.exam_weight,
-      subtopics: module.subtopics,
-      completed: module.completed,
-      progress: progress.percentage,
-      tasksCompleted: progress.completed,
-      tasksTotal: progress.total
-    };
-  });
 }
 

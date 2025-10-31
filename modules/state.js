@@ -1,6 +1,6 @@
 /**
- * State Management Module
- * Handles application state and state updates
+ * Application State Module
+ * Centralized state management for the study plan tracker
  */
 
 // Application State
@@ -27,127 +27,167 @@ export const appState = {
   ]
 };
 
-/**
- * Initialize application state with user data
- * @param {Object} userData - User data from Supabase
- */
-export function initializeState(userData) {
-  if (userData.settings) {
-    appState.userSettings = userData.settings;
-  }
-  if (userData.modules) {
-    appState.modules = userData.modules;
-  }
-  if (userData.dailySchedule) {
-    appState.dailySchedule = userData.dailySchedule;
-  }
-  if (userData.tasks) {
-    appState.tasks = userData.tasks;
-  }
-  if (userData.sbaSchedule) {
-    appState.sbaSchedule = userData.sbaSchedule;
-  }
-  if (userData.telegramQuestions) {
-    appState.telegramQuestions = userData.telegramQuestions;
-  }
-  if (userData.dailyNotes) {
-    appState.dailyNotes = userData.dailyNotes;
-  }
-  if (userData.catchUpQueue) {
-    appState.catchUpQueue = userData.catchUpQueue;
+// User Settings
+export function getUserSettings() {
+  return appState.userSettings;
+}
+
+export function setUserSettings(settings) {
+  appState.userSettings = settings;
+}
+
+// Modules
+export function getModules() {
+  return appState.modules;
+}
+
+export function setModules(modules) {
+  appState.modules = modules;
+}
+
+export function getModuleById(id) {
+  return appState.modules.find(m => m.id === id);
+}
+
+export function updateModuleInState(id, updates) {
+  const module = appState.modules.find(m => m.id === id);
+  if (module) {
+    Object.assign(module, updates);
   }
 }
 
-/**
- * Get current viewing date
- * @returns {Date}
- */
-export function getViewingDate() {
-  return appState.viewingDate;
+// Daily Schedule
+export function getDailySchedule() {
+  return appState.dailySchedule;
 }
 
-/**
- * Set viewing date
- * @param {Date} date
- */
-export function setViewingDate(date) {
-  appState.viewingDate = new Date(date);
+export function setDailySchedule(schedule) {
+  appState.dailySchedule = schedule;
 }
 
-/**
- * Get current viewing week start
- * @returns {Date|null}
- */
-export function getViewingWeekStart() {
-  return appState.viewingWeekStart;
+export function getScheduleForDate(dateStr) {
+  return appState.dailySchedule[dateStr];
 }
 
-/**
- * Set viewing week start
- * @param {Date} date
- */
-export function setViewingWeekStart(date) {
-  appState.viewingWeekStart = new Date(date);
+export function setScheduleForDate(dateStr, scheduleData) {
+  appState.dailySchedule[dateStr] = scheduleData;
 }
 
-/**
- * Get current viewing month
- * @returns {Date}
- */
-export function getViewingMonth() {
-  return appState.viewingMonth;
+// Tasks
+export function getTasks() {
+  return appState.tasks;
 }
 
-/**
- * Set viewing month
- * @param {Date} date
- */
-export function setViewingMonth(date) {
-  appState.viewingMonth = new Date(date);
+export function setTasks(tasks) {
+  appState.tasks = tasks;
 }
 
-/**
- * Get random motivational message
- * @returns {string}
- */
-export function getRandomMotivationalMessage() {
-  const messages = appState.motivationalMessages;
-  return messages[Math.floor(Math.random() * messages.length)];
+export function getTasksForDate(dateStr) {
+  return appState.tasks[dateStr] || [];
 }
 
-/**
- * Add item to catch-up queue
- * @param {Object} item
- */
-export function addToCatchUpQueue(item) {
-  appState.catchUpQueue.push(item);
+export function setTasksForDate(dateStr, tasks) {
+  appState.tasks[dateStr] = tasks;
 }
 
-/**
- * Remove item from catch-up queue
- * @param {number} itemId
- */
-export function removeFromCatchUpQueue(itemId) {
-  appState.catchUpQueue = appState.catchUpQueue.filter(item => item.id !== itemId);
+// SBA Schedule
+export function getSBASchedule() {
+  return appState.sbaSchedule;
 }
 
-/**
- * Get catch-up queue
- * @returns {Array}
- */
+export function setSBASchedule(schedule) {
+  appState.sbaSchedule = schedule;
+}
+
+export function getSBAForDate(dateStr) {
+  return appState.sbaSchedule[dateStr] || [];
+}
+
+export function setSBAForDate(dateStr, sbaEntries) {
+  appState.sbaSchedule[dateStr] = sbaEntries;
+}
+
+// Telegram Questions
+export function getTelegramQuestions() {
+  return appState.telegramQuestions;
+}
+
+export function setTelegramQuestions(questions) {
+  appState.telegramQuestions = questions;
+}
+
+export function getTelegramQuestionsForDate(dateStr) {
+  return appState.telegramQuestions[dateStr] || [];
+}
+
+export function setTelegramQuestionsForDate(dateStr, questions) {
+  appState.telegramQuestions[dateStr] = questions;
+}
+
+// Daily Notes
+export function getDailyNotes() {
+  return appState.dailyNotes;
+}
+
+export function setDailyNotes(notes) {
+  appState.dailyNotes = notes;
+}
+
+export function getDailyNoteForDate(dateStr) {
+  return appState.dailyNotes[dateStr] || '';
+}
+
+export function setDailyNoteForDate(dateStr, note) {
+  appState.dailyNotes[dateStr] = note;
+}
+
+// Catch-up Queue
 export function getCatchUpQueue() {
   return appState.catchUpQueue;
 }
 
-/**
- * Update catch-up queue item
- * @param {number} itemId
- * @param {Object} updates
- */
-export function updateCatchUpQueueItem(itemId, updates) {
-  const item = appState.catchUpQueue.find(i => i.id === itemId);
-  if (item) {
-    Object.assign(item, updates);
-  }
+export function setCatchUpQueue(queue) {
+  appState.catchUpQueue = queue;
+}
+
+export function addToCatchUpQueue(item) {
+  appState.catchUpQueue.push(item);
+}
+
+export function removeFromCatchUpQueue(itemId) {
+  appState.catchUpQueue = appState.catchUpQueue.filter(item => item.id !== itemId);
+}
+
+// Viewing Date
+export function getViewingDate() {
+  return appState.viewingDate;
+}
+
+export function setViewingDate(date) {
+  appState.viewingDate = new Date(date);
+}
+
+// Viewing Week Start
+export function getViewingWeekStart() {
+  return appState.viewingWeekStart;
+}
+
+export function setViewingWeekStart(date) {
+  appState.viewingWeekStart = date ? new Date(date) : null;
+}
+
+// Viewing Month
+export function getViewingMonth() {
+  return appState.viewingMonth;
+}
+
+export function setViewingMonth(date) {
+  appState.viewingMonth = new Date(date);
+}
+
+// Motivational Messages
+export function getRandomMotivationalMessage() {
+  const messages = appState.motivationalMessages;
+  return messages[Math.floor(Math.random() * messages.length)];
 }
 
