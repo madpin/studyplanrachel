@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Plan Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Authentication Screen -->
+    <div id="authScreen" class="auth-container">
+        <div class="auth-card">
+            <h1>Study Plan Tracker</h1>
+            <p class="auth-subtitle">Organize your study schedule and track your progress</p>
+
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="loginTab" onclick="switchAuthTab('login')">Login</button>
+                <button class="auth-tab" id="signupTab" onclick="switchAuthTab('signup')">Sign Up</button>
+            </div>
+
+            <!-- Login Form -->
+            <form id="loginForm" class="auth-form">
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" id="loginEmail" class="form-control" required placeholder="your@email.com">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" id="loginPassword" class="form-control" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn btn--primary btn--full-width">Login</button>
+                <div id="loginError" class="auth-error"></div>
+            </form>
+
+            <!-- Signup Form -->
+            <form id="signupForm" class="auth-form" style="display: none;">
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" id="signupEmail" class="form-control" required placeholder="your@email.com">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" id="signupPassword" class="form-control" required placeholder="••••••••" minlength="6">
+                    <small class="form-help">Minimum 6 characters</small>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Confirm Password</label>
+                    <input type="password" id="signupPasswordConfirm" class="form-control" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn btn--primary btn--full-width">Create Account</button>
+                <div id="signupError" class="auth-error"></div>
+                <div id="signupSuccess" class="auth-success"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App (hidden until authenticated) -->
+    <div id="mainApp" style="display: none;">
+        <div class="app-container">
+            <!-- Header with key stats -->
+            <header class="app-header">
+                <div class="header-content">
+                    <div class="header-left">
+                        <h1>Study Plan Tracker</h1>
+                        <p class="exam-date">Exam Date: <span id="headerExamDate">--</span></p>
+                    </div>
+                    <div class="header-stats">
+                        <div class="stat-card">
+                            <div class="stat-value" id="daysUntilExam">--</div>
+                            <div class="stat-label">Days to Exam</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="overallProgress">0%</div>
+                            <div class="stat-label">Overall Progress</div>
+                        </div>
+                        <div class="stat-card catch-up-stat">
+                            <div class="stat-value" id="catchUpCount">0</div>
+                            <div class="stat-label">Catch-up Tasks</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="motivational-banner" id="motivationalBanner">
+                    You've got this!
+                </div>
+                <div class="header-actions">
+                    <button onclick="showSettingsModal()" class="btn btn--secondary btn--sm">⚙️ Settings</button>
+                    <button onclick="handleLogout()" class="btn btn--outline btn--sm">Logout</button>
+                </div>
+            </header>
+
+            <!-- Navigation tabs -->
+            <nav class="view-tabs">
+                <button class="tab-btn active" data-view="daily" onclick="switchView('daily')">
+                    Daily View
+                </button>
+                <button class="tab-btn" data-view="weekly" onclick="switchView('weekly')">
+                    Weekly View
+                </button>
+                <button class="tab-btn" data-view="calendar" onclick="switchView('calendar')">
+                    Calendar View
+                </button>
+                <button class="tab-btn" data-view="modules" onclick="switchView('modules')">
+                    Module Progress
+                </button>
+            </nav>
+
+            <!-- Main content area -->
+            <main class="main-content">
+                <!-- Loading indicator -->
+                <div id="loadingIndicator" class="loading-container">
+                    <div class="loading-spinner"></div>
+                    <p>Loading your study plan...</p>
+                </div>
+
+                <!-- Catch-up Queue Panel -->
+                <div id="catchUpQueue" class="catch-up-queue-panel" style="display: none;">
+                    <div class="catch-up-header">
+                        <h3>⚠️ Catch-up Queue</h3>
+                        <button onclick="toggleCatchUpQueue()" class="btn btn--sm btn--secondary" id="toggleCatchUpBtn">Hide</button>
+                    </div>
+                    <div id="catchUpContent" class="catch-up-content">
+                        <p class="no-catchup">No catch-up tasks! You're all caught up! 🎉</p>
+                    </div>
+                </div>
+
+                <!-- Daily View -->
+                <section id="dailyView" class="view-section active" style="display: none;">
+                    <div class="view-header">
+                        <h2>Today's Study Plan</h2>
+                        <div class="date-navigator">
+                            <button onclick="changeDay(-1)" class="nav-btn">← Previous</button>
+                            <span id="currentDate" class="current-date">--</span>
+                            <button onclick="changeDay(1)" class="nav-btn">Next →</button>
+                        </div>
+                    </div>
+
+                    <div class="day-info" id="dayInfo">
+                        <span class="day-type-badge" id="dayTypeBadge">Regular Day</span>
+                        <span class="work-info" id="workInfo"></span>
+                    </div>
+
+                    <div class="daily-content" id="dailyContent">
+                        <!-- Daily tasks will be populated here -->
+                    </div>
+
+                    <div class="notes-section">
+                        <h3>Daily Notes</h3>
+                        <textarea id="dailyNotes" placeholder="Add any notes about today's study session..."></textarea>
+                    </div>
+                </section>
+
+                <!-- Weekly View -->
+                <section id="weeklyView" class="view-section" style="display: none;">
+                    <div class="view-header">
+                        <h2>Weekly Overview</h2>
+                        <div class="week-navigator">
+                            <button onclick="changeWeek(-1)" class="nav-btn">← Previous Week</button>
+                            <span id="currentWeek" class="current-date">--</span>
+                            <button onclick="changeWeek(1)" class="nav-btn">Next Week →</button>
+                        </div>
+                    </div>
+                    <div id="weeklyContent" class="weekly-content">
+                        <!-- Weekly view will be populated here -->
+                    </div>
+                </section>
+
+                <!-- Calendar View -->
+                <section id="calendarView" class="view-section" style="display: none;">
+                    <div class="view-header">
+                        <h2>Study Calendar</h2>
+                        <div class="month-navigator">
+                            <button onclick="changeMonth(-1)" class="nav-btn">← Previous</button>
+                            <span id="currentMonth" class="current-date">--</span>
+                            <button onclick="changeMonth(1)" class="nav-btn">Next →</button>
+                        </div>
+                    </div>
+                    <div class="calendar-legend">
+                        <span class="legend-item"><span class="legend-color work-day"></span> Work Day</span>
+                        <span class="legend-item"><span class="legend-color revision-day"></span> Revision Day</span>
+                        <span class="legend-item"><span class="legend-color brazil-trip"></span> Trip Day</span>
+                    </div>
+                    <div id="calendarContent" class="calendar-grid">
+                        <!-- Calendar will be populated here -->
+                    </div>
+                </section>
+
+                <!-- Module Progress View -->
+                <section id="modulesView" class="view-section" style="display: none;">
+                    <div class="view-header">
+                        <h2>Module Progress Overview</h2>
+                        <button onclick="showAddModuleModal()" class="btn btn--primary btn--sm">+ Add Module</button>
+                    </div>
+                    <div id="modulesContent" class="modules-grid">
+                        <!-- Modules will be populated here -->
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Settings</h3>
+                <button onclick="closeSettingsModal()" class="modal-close">&times;</button>
+            </div>
+            <form id="settingsForm" class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Exam Date</label>
+                    <input type="date" id="settingsExamDate" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Trip Start Date (optional)</label>
+                    <input type="date" id="settingsTripStart" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Trip End Date (optional)</label>
+                    <input type="date" id="settingsTripEnd" class="form-control">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" onclick="closeSettingsModal()" class="btn btn--outline">Cancel</button>
+                    <button type="submit" class="btn btn--primary">Save Settings</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Supabase Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- App Scripts -->
+    <script src="config.js"></script>
+    <script src="auth.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
