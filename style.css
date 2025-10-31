@@ -2775,3 +2775,350 @@ body {
     align-items: stretch;
   }
 }
+
+/* ============================================
+   Modern UI Enhancements
+   ============================================ */
+
+/* Clickable elements */
+.clickable {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.clickable:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.clickable:active {
+  transform: translateY(0);
+}
+
+/* Day type badge improvements */
+.day-type-badge {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 550;
+  transition: all 0.2s ease;
+}
+
+.day-type-badge.clickable:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Enhanced card styles */
+.module-card,
+.sba-test-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.module-card:hover,
+.sba-test-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+/* Button enhancements */
+.btn {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.btn:active::before {
+  width: 300px;
+  height: 300px;
+}
+
+.btn--primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(var(--color-teal-500-rgb), 0.3);
+}
+
+.btn--secondary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Progress bar animations */
+.progress-bar {
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Task item interactions */
+.task-item {
+  transition: all 0.2s ease;
+}
+
+.task-item:hover {
+  background: rgba(var(--color-teal-500-rgb), 0.03);
+  border-left: 3px solid var(--color-teal-500);
+  padding-left: 13px;
+}
+
+.task-item.completed {
+  opacity: 0.7;
+}
+
+/* Calendar day cells - larger and more interactive */
+.calendar-day {
+  transition: all 0.2s ease;
+  cursor: pointer;
+  min-height: 100px;
+}
+
+.calendar-day:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+.calendar-day.today {
+  box-shadow: 0 0 0 2px var(--color-primary);
+}
+
+.calendar-day.today:hover {
+  box-shadow: 0 0 0 2px var(--color-primary), 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Enhanced modal animations */
+.modal {
+  animation: fadeIn 0.2s ease;
+}
+
+.modal > div {
+  animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Enhanced form inputs */
+input[type="text"],
+input[type="date"],
+input[type="number"],
+textarea,
+select {
+  transition: all 0.2s ease;
+}
+
+input[type="text"]:focus,
+input[type="date"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+select:focus {
+  transform: scale(1.01);
+  box-shadow: var(--focus-ring);
+}
+
+/* Checkbox animations */
+input[type="checkbox"] {
+  transition: all 0.2s ease;
+}
+
+input[type="checkbox"]:checked {
+  animation: checkboxPop 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes checkboxPop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Loading spinner improvements */
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Badge enhancements */
+.placeholder-badge,
+.source-badge {
+  transition: all 0.2s ease;
+}
+
+.placeholder-badge:hover,
+.source-badge:hover {
+  transform: scale(1.05);
+}
+
+/* Motivational banner animation */
+.motivational-banner {
+  animation: fadeIn 0.5s ease;
+}
+
+/* Smooth transitions for view switching */
+.view-container > div {
+  animation: fadeIn 0.3s ease;
+}
+
+/* Enhanced catch-up queue */
+.catch-up-item {
+  transition: all 0.2s ease;
+}
+
+.catch-up-item:hover {
+  background: rgba(var(--color-orange-500-rgb), 0.05);
+  border-left-width: 4px;
+}
+
+/* Improved calendar indicators */
+.calendar-indicator {
+  transition: all 0.2s ease;
+}
+
+.calendar-day:hover .calendar-indicator {
+  transform: scale(1.05);
+}
+
+/* Better focus states */
+*:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: 2px;
+}
+
+/* Subtle animations for stats */
+.header-stat {
+  transition: all 0.2s ease;
+}
+
+.header-stat:hover {
+  transform: scale(1.05);
+}
+
+/* Module progress enhancements */
+.module-progress {
+  transition: all 0.2s ease;
+}
+
+.module-card:hover .module-progress {
+  transform: scale(1.02);
+}
+
+/* SBA and Telegram item enhancements */
+.sba-schedule-item,
+.telegram-question-item {
+  transition: all 0.2s ease;
+}
+
+.sba-schedule-item:hover,
+.telegram-question-item:hover {
+  background: rgba(var(--color-teal-500-rgb), 0.03);
+  transform: translateX(4px);
+}
+
+/* Enhanced navigation */
+.nav-btn {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-btn:hover {
+  background: var(--color-secondary-hover);
+  transform: scale(1.05);
+}
+
+.nav-btn.active {
+  animation: pulse 0.5s ease;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

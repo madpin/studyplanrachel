@@ -985,11 +985,115 @@ async function completeOnboarding(examDate, tripStart, tripEnd, selectedModules,
       }
     }
 
+    // Seed daily schedule if using template
+    if (useTemplate) {
+      console.log('Seeding daily schedule from template...');
+      await seedDailySchedule(currentUser.id);
+    }
+
     console.log('Onboarding completed successfully');
     return true;
 
   } catch (error) {
     console.error('Error completing onboarding:', error);
+    throw error;
+  }
+}
+
+// Seed daily schedule from template
+async function seedDailySchedule(userId) {
+  try {
+    const scheduleEntries = Object.keys(templateDetailedSchedule).map(date => ({
+      user_id: userId,
+      date: date,
+      topics: templateDetailedSchedule[date].topics,
+      type: templateDetailedSchedule[date].type,
+      resources: templateDetailedSchedule[date].resources
+    }));
+    
+    const { error } = await supabase
+      .from('daily_schedule')
+      .upsert(scheduleEntries);
+    
+    if (error) throw error;
+    
+    console.log(`Seeded ${scheduleEntries.length} days of schedule`);
+  } catch (error) {
+    console.error('Error seeding daily schedule:', error);
+    throw error;
+  }
+}
+
+// Load daily schedule from database
+async function loadDailySchedule(userId) {
+  try {
+    const { data: schedule, error } = await supabase
+      .from('daily_schedule')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('date', '2025-11-01')
+      .lte('date', '2026-01-13');
+
+    if (error) throw error;
+
+    if (schedule && schedule.length > 0) {
+      schedule.forEach(entry => {
+        appState.dailySchedule[entry.date] = {
+          topics: entry.topics,
+          type: entry.type,
+          resources: entry.resources
+        };
+      });
+      console.log(`Loaded ${schedule.length} days of schedule from database`);
+    } else {
+      console.log('No schedule found in database, using template');
+      // Fall back to template
+      Object.keys(templateDetailedSchedule).forEach(date => {
+        appState.dailySchedule[date] = templateDetailedSchedule[date];
+      });
+    }
+  } catch (error) {
+    console.error('Error loading daily schedule:', error);
+    // Fall back to template on error
+    Object.keys(templateDetailedSchedule).forEach(date => {
+      appState.dailySchedule[date] = templateDetailedSchedule[date];
+    });
+  }
+}
+
+// Update day schedule type in database
+async function updateDayScheduleType(userId, date, newType) {
+  try {
+    // Get current schedule for this date
+    const currentSchedule = appState.dailySchedule[date] || templateDetailedSchedule[date];
+    
+    if (!currentSchedule) {
+      console.warn('No schedule found for date:', date);
+      return;
+    }
+
+    // Update in database
+    const { error } = await supabase
+      .from('daily_schedule')
+      .upsert({
+        user_id: userId,
+        date: date,
+        topics: currentSchedule.topics,
+        type: newType,
+        resources: currentSchedule.resources
+      });
+
+    if (error) throw error;
+
+    // Update local state
+    appState.dailySchedule[date] = {
+      ...currentSchedule,
+      type: newType
+    };
+
+    console.log(`Updated day ${date} to type: ${newType}`);
+  } catch (error) {
+    console.error('Error updating day schedule type:', error);
     throw error;
   }
 }
@@ -1006,6 +1110,9 @@ async function loadAllData() {
 
     if (modulesError) throw modulesError;
     appState.modules = modules || [];
+
+    // Load daily schedule
+    await loadDailySchedule(currentUser.id);
 
     // Load tasks for viewing date
     await loadTasksForDate(appState.viewingDate);
@@ -1315,23 +1422,33 @@ function updateHeaderStats() {
 
   const examDate = new Date(appState.userSettings.exam_date);
   const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const daysToExam = getDaysBetween(today, examDate);
 
   document.getElementById('daysUntilExam').textContent = daysToExam;
   document.getElementById('headerExamDate').textContent = formatDate(examDate);
 
-  // Calculate overall progress
-  const totalTasks = Object.values(appState.tasks).reduce((sum, categories) => {
-    return sum + categories.reduce((catSum, cat) => catSum + cat.tasks.length, 0);
-  }, 0);
-
-  const completedTasks = Object.values(appState.tasks).reduce((sum, categories) => {
-    return sum + categories.reduce((catSum, cat) =>
-      catSum + cat.tasks.filter(t => t.completed).length, 0);
-  }, 0);
+  // Calculate overall progress - ONLY TASKS UP TO TODAY
+  let totalTasks = 0;
+  let completedTasks = 0;
+  
+  Object.keys(appState.tasks).forEach(dateStr => {
+    const taskDate = new Date(dateStr);
+    taskDate.setHours(0, 0, 0, 0);
+    
+    // Only count tasks up to and including today
+    if (taskDate <= today) {
+      const categories = appState.tasks[dateStr] || [];
+      categories.forEach(cat => {
+        const tasksInCategory = cat.tasks || [];
+        totalTasks += tasksInCategory.length;
+        completedTasks += tasksInCategory.filter(t => t.completed).length;
+      });
+    }
+  });
 
   const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-  document.getElementById('overallProgress').textContent = `${progress}%`;
+  document.getElementById('overallProgress').textContent = `${progress}% (${completedTasks}/${totalTasks})`;
 }
 
 // Async helpers
@@ -1489,41 +1606,59 @@ function renderDailyView() {
 
   document.getElementById('currentDate').textContent = formatDate(date);
 
-  // Get day type using template functions
+  // Get day type using loaded schedule or template fallback
   const dayTypeBadge = document.getElementById('dayTypeBadge');
   const workInfoElement = document.getElementById('workInfo');
   
-  // Check if date is in template range (2025-11-01 to 2026-01-13)
-  const dateInTemplate = templateDetailedSchedule[dateStr];
+  // Check if date is in loaded schedule or template
+  const daySchedule = appState.dailySchedule[dateStr] || templateDetailedSchedule[dateStr];
   
-  if (dateInTemplate) {
-    // Use template day type
-    if (isTemplateWorkDay(date)) {
+  if (daySchedule) {
+    const dayType = daySchedule.type;
+    
+    // Set badge based on day type
+    if (dayType === 'work') {
       dayTypeBadge.textContent = 'Work Day';
-      dayTypeBadge.className = 'day-type-badge work-day';
-    } else if (isTemplateRevisionDay(date)) {
+      dayTypeBadge.className = 'day-type-badge work-day clickable';
+    } else if (dayType === 'revision') {
       dayTypeBadge.textContent = 'Revision Day';
-      dayTypeBadge.className = 'day-type-badge revision-day';
-    } else if (isTemplateBrazilTrip(date)) {
+      dayTypeBadge.className = 'day-type-badge revision-day clickable';
+    } else if (dayType === 'trip' || dayType === 'trip-end') {
       dayTypeBadge.textContent = 'Brazil Trip';
-      dayTypeBadge.className = 'day-type-badge brazil-trip';
-    } else if (dateInTemplate.type === 'intensive' || dateInTemplate.type === 'intensive-post') {
+      dayTypeBadge.className = 'day-type-badge brazil-trip clickable';
+    } else if (dayType === 'intensive' || dayType === 'intensive-post') {
       dayTypeBadge.textContent = 'Intensive Study';
-      dayTypeBadge.className = 'day-type-badge intensive-day';
-    } else if (dateInTemplate.type === 'rest' || dateInTemplate.type === 'exam-eve') {
-      dayTypeBadge.textContent = dateInTemplate.type === 'exam-eve' ? 'Exam Eve' : 'Rest Day';
-      dayTypeBadge.className = 'day-type-badge rest-day';
-    } else if (dateInTemplate.type === 'light') {
+      dayTypeBadge.className = 'day-type-badge intensive-day clickable';
+    } else if (dayType === 'rest' || dayType === 'exam-eve') {
+      dayTypeBadge.textContent = dayType === 'exam-eve' ? 'Exam Eve' : 'Rest Day';
+      dayTypeBadge.className = 'day-type-badge rest-day clickable';
+    } else if (dayType === 'light') {
       dayTypeBadge.textContent = 'Light Study';
-      dayTypeBadge.className = 'day-type-badge light-day';
+      dayTypeBadge.className = 'day-type-badge light-day clickable';
     } else {
       dayTypeBadge.textContent = 'Study Day';
-      dayTypeBadge.className = 'day-type-badge';
+      dayTypeBadge.className = 'day-type-badge clickable';
     }
     
-    workInfoElement.textContent = getTemplateWorkInfo(date);
+    // Make badge clickable to change day type
+    dayTypeBadge.onclick = () => showDayTypeEditor(dateStr, dayType);
+    
+    // Set work info based on type
+    const infoMap = {
+      'work': '🏥 WORK DAY (1000-2200 shift) - Focus on 1 specific topic only',
+      'off': '📚 OFF DAY - Full study capacity with multiple topics',
+      'revision': '🔄 REVISION DAY - Comprehensive review + Mock exam',
+      'intensive': '🔥 INTENSIVE STUDY DAY - Deep dive into topics',
+      'intensive-post': '💪 POST-BRAZIL INTENSIVE - Get back on track',
+      'trip': '🌴 BRAZIL TRIP - Minimal/optional study',
+      'trip-end': '🌴 BRAZIL TRIP ENDS - Ease back into study',
+      'rest': '😌 REST DAY - Very light review only',
+      'exam-eve': '🎯 EXAM EVE - Mental preparation, early night',
+      'light': '📖 LIGHT STUDY DAY - Reduced load'
+    };
+    workInfoElement.textContent = infoMap[dayType] || 'Regular study day';
   } else {
-    // Default for non-template dates
+    // Default for dates without schedule
     dayTypeBadge.textContent = 'Study Day';
     dayTypeBadge.className = 'day-type-badge';
     workInfoElement.textContent = 'Regular study day';
@@ -2020,8 +2155,17 @@ async function renderModulesView() {
   }));
 
   modulesContent.innerHTML = modulesWithStats.map(module => {
-    const progress = module.subtopics > 0 ?
+    // Calculate manual subtopic progress
+    const manualProgress = module.subtopics > 0 ?
       Math.round((module.completed / module.subtopics) * 100) : 0;
+    
+    // Calculate task-based progress
+    const taskProgress = module.stats.totalTasks > 0 ?
+      Math.round((module.stats.completedTasks / module.stats.totalTasks) * 100) : 0;
+    
+    // Combined progress: average of both if tasks exist, otherwise use manual only
+    const combinedProgress = module.stats.totalTasks > 0 ?
+      Math.round((manualProgress + taskProgress) / 2) : manualProgress;
 
     return `
       <div class="module-card">
@@ -2031,15 +2175,15 @@ async function renderModulesView() {
         </div>
         <div class="module-progress">
           <div class="progress-bar-container">
-            <div class="progress-bar" style="width: ${progress}%; background-color: ${module.color};"></div>
+            <div class="progress-bar" style="width: ${combinedProgress}%; background-color: ${module.color};"></div>
           </div>
           <div class="progress-text">
-            <span>${progress}% complete</span>
-            <span>${module.completed}/${module.subtopics} subtopics</span>
+            <span>${combinedProgress}% complete</span>
+            <span>${module.completed}/${module.subtopics} subtopics checked</span>
           </div>
           ${module.stats.totalTasks > 0 || module.stats.placeholders > 0 ? `
             <div class="module-task-stats">
-              <span>${module.stats.completedTasks}/${module.stats.totalTasks} tasks</span>
+              <span>📚 ${module.stats.completedTasks}/${module.stats.totalTasks} daily tasks (${taskProgress}%)</span>
               ${module.stats.placeholders > 0 ? `<span class="placeholder-count">(${module.stats.placeholders} placeholders)</span>` : ''}
             </div>
           ` : ''}
@@ -2105,6 +2249,71 @@ document.getElementById('settingsForm').addEventListener('submit', async (e) => 
 // Add Module Modal (placeholder)
 function showAddModuleModal() {
   alert('Add module functionality coming soon!');
+}
+
+// Day Type Editor
+function showDayTypeEditor(dateStr, currentType) {
+  const dayTypes = [
+    { value: 'work', label: 'Work Day', emoji: '🏥' },
+    { value: 'off', label: 'Off Day', emoji: '📚' },
+    { value: 'revision', label: 'Revision Day', emoji: '🔄' },
+    { value: 'intensive', label: 'Intensive Study', emoji: '🔥' },
+    { value: 'intensive-post', label: 'Post-Brazil Intensive', emoji: '💪' },
+    { value: 'light', label: 'Light Study', emoji: '📖' },
+    { value: 'rest', label: 'Rest Day', emoji: '😌' },
+    { value: 'trip', label: 'Trip Day', emoji: '🌴' },
+    { value: 'trip-end', label: 'Trip End', emoji: '🌴' },
+    { value: 'exam-eve', label: 'Exam Eve', emoji: '🎯' }
+  ];
+  
+  const options = dayTypes.map(type => `
+    <option value="${type.value}" ${type.value === currentType ? 'selected' : ''}>
+      ${type.emoji} ${type.label}
+    </option>
+  `).join('');
+  
+  const html = `
+    <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;" onclick="if(event.target === this) closeDayTypeEditor()">
+      <div style="background: white; padding: 24px; border-radius: 12px; max-width: 400px; width: 90%;" onclick="event.stopPropagation()">
+        <h3 style="margin-top: 0;">Change Day Type</h3>
+        <p style="font-size: 14px; color: #666; margin-bottom: 16px;">Select the day type for ${new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+        <select id="dayTypeSelector" style="width: 100%; padding: 12px; font-size: 16px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 16px;">
+          ${options}
+        </select>
+        <div style="display: flex; gap: 8px; justify-content: flex-end;">
+          <button onclick="closeDayTypeEditor()" class="btn btn--secondary">Cancel</button>
+          <button onclick="saveDayType('${dateStr}')" class="btn btn--primary">Save</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  const modal = document.createElement('div');
+  modal.id = 'dayTypeEditorModal';
+  modal.innerHTML = html;
+  document.body.appendChild(modal);
+}
+
+function closeDayTypeEditor() {
+  const modal = document.getElementById('dayTypeEditorModal');
+  if (modal) {
+    modal.remove();
+  }
+}
+
+async function saveDayType(dateStr) {
+  const selector = document.getElementById('dayTypeSelector');
+  const newType = selector.value;
+  
+  try {
+    await updateDayScheduleType(currentUser.id, dateStr, newType);
+    closeDayTypeEditor();
+    renderDailyView();
+    alert('Day type updated successfully!');
+  } catch (error) {
+    console.error('Error saving day type:', error);
+    alert('Failed to save day type: ' + error.message);
+  }
 }
 
 // Default dates from the original schedule
