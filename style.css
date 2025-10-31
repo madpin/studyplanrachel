@@ -1405,6 +1405,23 @@ body {
 .week-day-info {
   font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.week-item {
+  font-size: var(--font-size-xs);
+  padding: var(--space-4) var(--space-8);
+  background-color: var(--color-bg-1);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+}
+
+.week-item-empty {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-style: italic;
 }
 
 .week-day-modules {
@@ -1509,6 +1526,29 @@ body {
   font-weight: var(--font-weight-semibold);
   font-size: var(--font-size-base);
   margin-bottom: var(--space-4);
+}
+
+.calendar-day-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.calendar-indicator {
+  font-size: var(--font-size-xs);
+  padding: var(--space-2) var(--space-4);
+  background-color: var(--color-bg-1);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calendar-day.has-items {
+  border-color: var(--color-primary);
+  background-color: rgba(var(--color-primary-rgb, 33, 128, 141), 0.05);
 }
 
 .calendar-day-info {
@@ -2116,6 +2156,115 @@ body {
   margin-bottom: 0;
 }
 
+/* ===== ONBOARDING MODAL STYLES ===== */
+
+.modal-large {
+  max-width: 800px;
+}
+
+.onboarding-section {
+  margin-bottom: var(--space-32);
+  padding-bottom: var(--space-24);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.onboarding-section:last-of-type {
+  border-bottom: none;
+}
+
+.onboarding-section h4 {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  margin-bottom: var(--space-16);
+}
+
+.section-description {
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-20);
+  line-height: var(--line-height-normal);
+}
+
+.module-selector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.module-selector-header {
+  display: flex;
+  gap: var(--space-8);
+  justify-content: flex-end;
+}
+
+.module-checkboxes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-12);
+  max-height: 400px;
+  overflow-y: auto;
+  padding: var(--space-12);
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-base);
+}
+
+.module-checkbox-item {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-base);
+  padding: var(--space-12);
+  transition: all 0.2s ease;
+}
+
+.module-checkbox-item:hover {
+  background-color: var(--color-bg-1);
+  box-shadow: var(--shadow-sm);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-12);
+  cursor: pointer;
+  user-select: none;
+}
+
+.module-checkbox {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  cursor: pointer;
+  accent-color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.module-checkbox-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  flex: 1;
+}
+
+.module-checkbox-name {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.module-checkbox-details {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.btn--large {
+  padding: var(--space-16) var(--space-32);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  border-radius: var(--radius-md);
+}
+
 /* ===== RESPONSIVE UPDATES ===== */
 
 @media (max-width: 768px) {
@@ -2128,6 +2277,15 @@ body {
     margin: var(--space-16);
   }
 
+  .modal-large {
+    max-width: 100%;
+  }
+
+  .module-checkboxes {
+    grid-template-columns: 1fr;
+    max-height: 300px;
+  }
+
   .modal-header, .modal-body {
     padding: var(--space-16);
   }
@@ -2138,5 +2296,482 @@ body {
 
   .header-actions button {
     flex: 1;
+  }
+}
+
+/* ============================================ */
+/* SBA and Telegram Views */
+/* ============================================ */
+
+.header-actions-inline {
+  display: flex;
+  gap: var(--space-12);
+  align-items: center;
+}
+
+/* SBA View */
+.sba-container {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: var(--space-24);
+  margin-top: var(--space-24);
+}
+
+.sba-tests-list {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-8);
+  padding: var(--space-16);
+  background: var(--color-surface);
+}
+
+.sba-test-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-6);
+  padding: var(--space-16);
+  margin-bottom: var(--space-12);
+  background: var(--color-background);
+}
+
+.sba-test-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-12);
+}
+
+.sba-test-name {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-md);
+}
+
+.sba-test-actions {
+  display: flex;
+  gap: var(--space-8);
+}
+
+.sba-test-details {
+  display: flex;
+  gap: var(--space-16);
+  margin-bottom: var(--space-12);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.sba-test-progress {
+  margin-top: var(--space-8);
+}
+
+.sba-schedule-section {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-8);
+  padding: var(--space-16);
+  background: var(--color-surface);
+}
+
+.date-range-selector {
+  display: flex;
+  gap: var(--space-12);
+  align-items: center;
+  margin-bottom: var(--space-16);
+  padding-bottom: var(--space-16);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.date-range-selector label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.date-range-selector .form-control {
+  flex: 1;
+}
+
+.sba-schedule-day {
+  margin-bottom: var(--space-16);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-6);
+  padding: var(--space-12);
+  background: var(--color-background);
+}
+
+.sba-schedule-date {
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--space-12);
+  padding-bottom: var(--space-8);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sba-schedule-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.sba-schedule-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-8);
+  border-radius: var(--radius-4);
+  transition: background-color 0.2s;
+}
+
+.sba-schedule-item:hover {
+  background: var(--color-secondary);
+}
+
+.sba-schedule-item.completed {
+  opacity: 0.6;
+}
+
+.sba-schedule-item.completed .sba-schedule-name {
+  text-decoration: line-through;
+}
+
+.sba-schedule-item.placeholder {
+  border: 1px dashed var(--color-border);
+  background: rgba(var(--color-warning-rgb), 0.05);
+}
+
+.sba-schedule-name {
+  flex: 1;
+  font-size: var(--font-size-sm);
+}
+
+.delete-btn {
+  margin-left: auto;
+}
+
+/* Telegram View */
+.telegram-filters {
+  display: flex;
+  gap: var(--space-12);
+  align-items: flex-end;
+  margin-top: var(--space-24);
+  padding: var(--space-16);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-8);
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  flex: 1;
+}
+
+.filter-group label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.telegram-questions-day {
+  margin-top: var(--space-16);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-8);
+  padding: var(--space-16);
+  background: var(--color-surface);
+}
+
+.telegram-day-header {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-lg);
+  margin-bottom: var(--space-12);
+  padding-bottom: var(--space-8);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.telegram-questions-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.telegram-question-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-12);
+  padding: var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-6);
+  background: var(--color-background);
+  transition: all 0.2s;
+}
+
+.telegram-question-item:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.telegram-question-item.completed {
+  opacity: 0.6;
+}
+
+.telegram-question-item.completed .telegram-question-text {
+  text-decoration: line-through;
+}
+
+.telegram-question-item.placeholder {
+  border: 1px dashed var(--color-border);
+  background: rgba(var(--color-warning-rgb), 0.05);
+}
+
+.telegram-question-content {
+  flex: 1;
+}
+
+.telegram-question-text {
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  margin-bottom: var(--space-8);
+}
+
+.telegram-question-meta {
+  display: flex;
+  gap: var(--space-8);
+  align-items: center;
+}
+
+.source-badge {
+  font-size: var(--font-size-xs);
+  padding: var(--space-2) var(--space-8);
+  background: rgba(var(--color-primary-rgb), 0.1);
+  color: var(--color-primary);
+  border-radius: var(--radius-4);
+  font-weight: var(--font-weight-medium);
+}
+
+.telegram-question-actions {
+  display: flex;
+  gap: var(--space-8);
+  align-items: center;
+}
+
+/* Placeholder indicators */
+.placeholder-badge {
+  display: inline-block;
+  font-size: var(--font-size-xs);
+  padding: var(--space-2) var(--space-8);
+  background: rgba(var(--color-warning-rgb), 0.15);
+  color: var(--color-warning);
+  border-radius: var(--radius-4);
+  font-weight: var(--font-weight-medium);
+  margin-left: var(--space-8);
+}
+
+.placeholder-count {
+  font-size: var(--font-size-xs);
+  color: var(--color-warning);
+  font-style: italic;
+}
+
+/* Bulk Upload Modal */
+.json-format-guide {
+  margin-top: var(--space-16);
+  padding: var(--space-12);
+  background: var(--color-secondary);
+  border-radius: var(--radius-6);
+  font-size: var(--font-size-xs);
+}
+
+.json-format-guide strong {
+  display: block;
+  margin-bottom: var(--space-8);
+}
+
+.json-format-guide p {
+  margin-top: var(--space-8);
+  margin-bottom: var(--space-4);
+  font-weight: var(--font-weight-medium);
+}
+
+.json-format-guide code {
+  display: block;
+  padding: var(--space-8);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-4);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin-top: var(--space-4);
+}
+
+.upload-result {
+  margin-top: var(--space-16);
+  padding: var(--space-12);
+  border-radius: var(--radius-6);
+  font-size: var(--font-size-sm);
+}
+
+.success-message {
+  color: var(--color-success);
+  background: rgba(var(--color-success-rgb), 0.1);
+  padding: var(--space-12);
+  border-radius: var(--radius-6);
+  border: 1px solid rgba(var(--color-success-rgb), 0.3);
+}
+
+.error-message {
+  color: var(--color-error);
+  background: rgba(var(--color-error-rgb), 0.1);
+  padding: var(--space-12);
+  border-radius: var(--radius-6);
+  border: 1px solid rgba(var(--color-error-rgb), 0.3);
+}
+
+/* Placeholder Calendar Modal */
+.modal-large {
+  max-width: 900px;
+  width: 90%;
+}
+
+.placeholder-calendar {
+  margin-top: var(--space-16);
+  overflow-x: auto;
+}
+
+.placeholder-calendar-month {
+  display: flex;
+  gap: var(--space-24);
+}
+
+.placeholder-month {
+  flex: 1;
+  min-width: 250px;
+}
+
+.placeholder-month-header {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-md);
+  margin-bottom: var(--space-12);
+  padding-bottom: var(--space-8);
+  border-bottom: 1px solid var(--color-border);
+  text-align: center;
+}
+
+.placeholder-days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--space-4);
+}
+
+.placeholder-day-header {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+  padding: var(--space-4);
+  color: var(--color-text-secondary);
+}
+
+.placeholder-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-4);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: var(--font-size-sm);
+  background: var(--color-background);
+}
+
+.placeholder-day:hover:not(.empty):not(.past) {
+  background: var(--color-secondary);
+  border-color: var(--color-primary);
+}
+
+.placeholder-day.empty {
+  border: none;
+  cursor: default;
+}
+
+.placeholder-day.past {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.placeholder-day.weekend {
+  background: rgba(var(--color-info-rgb), 0.05);
+}
+
+.placeholder-day.selected {
+  background: var(--color-primary);
+  color: var(--color-white);
+  border-color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.selected-dates-display {
+  margin-top: var(--space-16);
+  padding: var(--space-12);
+  background: var(--color-secondary);
+  border-radius: var(--radius-6);
+  font-size: var(--font-size-sm);
+}
+
+.selected-dates-display strong {
+  margin-right: var(--space-8);
+}
+
+/* Module Task Stats */
+.module-task-stats {
+  margin-top: var(--space-8);
+  padding-top: var(--space-8);
+  border-top: 1px solid var(--color-border);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  display: flex;
+  gap: var(--space-8);
+  align-items: center;
+}
+
+/* Empty States */
+.empty-state {
+  text-align: center;
+  padding: var(--space-32);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .sba-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .placeholder-calendar-month {
+    flex-direction: column;
+  }
+  
+  .telegram-filters {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 640px) {
+  .header-actions-inline {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .header-actions-inline button {
+    width: 100%;
+  }
+  
+  .telegram-question-item {
+    flex-direction: column;
+  }
+  
+  .telegram-question-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  
+  .date-range-selector {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

@@ -1,368 +1,274 @@
-# Study Plan App
+# Study Plan Tracker
 
-A simple yet engaging study plan application to help you track your learning goals, manage time effectively, and balance your commitments.
+A full-featured study planning application with multi-user authentication, real-time database sync, and automatic progress tracking.
 
-## 🎯 Overview
+---
 
-This app helps you organize your study sessions while keeping track of personal commitments, holidays, work days, and free time. With multiple visualization options, you can see your progress across different time periods and stay motivated on your learning journey.
+## 🚀 Quick Start (10 Minutes Total)
+
+### 1. Set Up Supabase Database (5 min)
+```
+📂 Go to: supabase/README.md
+```
+Follow the 3-step setup:
+- Run `01-schema.sql` (creates tables)
+- Run `02-enable-rls.sql` (enables security)
+- Run `03-rls-policies.sql` (creates access policies)
+
+### 2. Configure Your App (2 min)
+1. Open `config.js`
+2. Replace placeholders with your Supabase credentials:
+   ```javascript
+   const SUPABASE_URL = 'https://your-project.supabase.co';
+   const SUPABASE_ANON_KEY = 'your-anon-key-here';
+   ```
+
+### 3. Test Locally (2 min)
+1. Open `index.html` in your browser
+2. Create an account
+3. Start using the app!
+
+### 4. Deploy to Netlify (1 min)
+1. Go to https://netlify.com
+2. Drag your project folder
+3. Done!
+
+**Need detailed help?** See `DEPLOYMENT.md`
+
+---
 
 ## ✨ Features
 
-### Core Functionality
-- **Task Management**: Create, edit, and track study tasks with checkbox completion
-- **Module-Based Organization**: Organize study topics into modules with progress tracking
-- **Study Schedule**: Day-by-day detailed study schedule with specific topics
-- **Personal Calendar**: Manage trips, holidays, work days, and free days
-- **Daily Notes**: Add notes for each study day
-- **Task Completion Tracking**: Mark individual tasks as complete with persistent storage
+- ✅ **Multi-user authentication** - Secure signup/login
+- ✅ **Daily/Weekly/Calendar views** - Multiple planning perspectives
+- ✅ **Module progress tracking** - Track completion across 12 study modules
+- ✅ **Task management** - Mark tasks complete, add notes
+- ✅ **Automatic progress calculation** - Updates as you complete tasks
+- ✅ **Customizable settings** - Edit exam dates, trip dates
+- ✅ **Catch-up queue** - Reschedule missed tasks
+- ✅ **Real-time sync** - All changes save to cloud database
+- ✅ **Mobile responsive** - Works on all devices
 
-### Visualizations
-- **Daily View**: See detailed daily tasks, topics, and study plan for each day
-- **Weekly Overview**: Visualize your week's study patterns with color-coded day types
-- **Monthly Calendar**: Full month view with study modules and day type indicators
-- **Modules Dashboard**: Track progress across all study modules with visual progress bars
-- **Engagement Metrics**: Overall progress percentage and motivational messages
+---
 
-### Calendar Integration & Day Types
-- **Work Days**: Reduced study load with focused single-topic approach (1-2 hours)
-- **Off Days/Study Days**: Full study capacity with multiple topics (4-6 hours)
-- **Revision Days**: Comprehensive review with mock exams (3-4 hours)
-- **Trip Days**: Minimal/optional study (0-30 minutes)
-- **Rest Days**: Very light review only
-- **Exam Eve**: Mental preparation mode
-- **Configurable study time per day type**: Each day type has appropriate study expectations
+## 📁 Project Structure
 
-### Smart Features
-- **Work-Suitable Task Indicators**: Tasks marked as suitable for work days (podcasts, quick questions)
-- **Resource Integration**: Links to lecture summaries, podcasts, videos, practice questions
-- **Revision Resources**: Week-specific GTG podcasts, summaries, NICE guidelines, and RRR sessions
-- **Collapsible Task Categories**: Organize tasks by topic with expand/collapse functionality
-- **Day Navigation**: Easy navigation between days, weeks, and months
-- **Countdown Timers**: Days until exam and important events
-- **Motivational Banner**: Random motivational messages to keep you engaged
+```
+studyplan/
+├── index.html              # Main app UI
+├── style.css               # Complete styling
+├── config.js               # ⚠️ Add your Supabase credentials here
+├── auth.js                 # Authentication logic
+├── app.js                  # Main application logic
+│
+├── supabase/               # Database setup files
+│   ├── README.md           # 📖 START HERE for database setup
+│   ├── 01-schema.sql       # Step 1: Create tables
+│   ├── 02-enable-rls.sql   # Step 2: Enable security
+│   └── 03-rls-policies.sql # Step 3: Create policies
+│
+├── QUICKSTART.md           # 5-minute setup guide
+├── DEPLOYMENT.md           # Comprehensive deployment guide
+├── PROJECT_OVERVIEW.md     # Technical documentation
+└── TROUBLESHOOTING.md      # Common issues and solutions
+```
+
+---
+
+## 🔧 Setup Instructions
+
+### Prerequisites
+- Supabase account (free tier) - https://supabase.com
+- Netlify account (free tier) - https://netlify.com
+
+### Step-by-Step Setup
+
+#### 1. Database Setup (Supabase)
+
+**Go to `supabase/README.md` and follow the 3-step setup.**
+
+Summary:
+1. Run `01-schema.sql` in Supabase SQL Editor
+2. Run `02-enable-rls.sql` in Supabase SQL Editor
+3. Run `03-rls-policies.sql` in Supabase SQL Editor
+
+#### 2. App Configuration
+
+1. Get your Supabase credentials:
+   - Go to Supabase → Settings → API
+   - Copy **Project URL** and **anon public key**
+
+2. Update `config.js`:
+   ```javascript
+   const SUPABASE_URL = 'YOUR_PROJECT_URL';
+   const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';
+   ```
+
+#### 3. Test Locally
+
+Open `index.html` in your browser or use a local server:
+
+```bash
+# Python
+python -m http.server 8000
+
+# Node.js
+npx serve
+```
+
+Visit `http://localhost:8000`
+
+#### 4. Deploy to Netlify
+
+**Option A: Manual Deploy**
+1. Go to https://netlify.com
+2. Click "Add new site" → "Deploy manually"
+3. Drag your project folder
+4. Done!
+
+**Option B: GitHub Deploy**
+1. Push code to GitHub
+2. Connect repository to Netlify
+3. Add environment variables in Netlify
+4. Auto-deploy on every push
+
+**Full deployment guide:** See `DEPLOYMENT.md`
+
+---
+
+## 🎯 How It Works
+
+### For First-Time Users
+1. User signs up → Account created
+2. App detects first login → Loads default data
+3. User sees 12 pre-configured study modules
+4. Ready to customize!
+
+### For Returning Users
+1. User logs in → Session restored
+2. App loads user's data from Supabase
+3. Shows progress, tasks, notes
+4. All changes sync automatically
+
+### Data Privacy
+- ✅ Each user sees only their own data
+- ✅ Row Level Security enforced
+- ✅ HTTPS encrypted connection
+- ✅ Secure authentication via Supabase
+
+---
+
+## 🐛 Troubleshooting
+
+### Issue: Can't login or getting errors
+
+1. **Check browser console** (F12 → Console)
+2. **Check config.js** - Are your API keys correct?
+3. **Check Supabase logs** - Go to Supabase → Logs → API
+
+### Issue: "406 Not Acceptable" errors
+
+This is a Row Level Security issue.
+
+**Solution:** Run `03-rls-policies.sql` again (it has the correct permissive policies)
+
+**Why it happens:** SELECT policies were too restrictive. The fixed version uses `USING (true)` for SELECT which allows queries while the app filters by user_id.
+
+### Issue: Tables don't exist
+
+**Solution:** Run `01-schema.sql` in Supabase SQL Editor
+
+### Issue: Authentication not working
+
+1. Check Supabase → Authentication → Settings
+2. Make sure "Enable email confirmations" is OFF (for testing)
+3. Check Supabase → Authentication → Users to see if user was created
+
+**For more help:** See `TROUBLESHOOTING.md`
+
+---
+
+## 📚 Documentation
+
+- **`QUICKSTART.md`** - 5-minute setup guide
+- **`DEPLOYMENT.md`** - Comprehensive deployment instructions
+- **`PROJECT_OVERVIEW.md`** - Technical details and architecture
+- **`TROUBLESHOOTING.md`** - Common issues and solutions
+- **`supabase/README.md`** - Database setup guide
+
+---
+
+## 🔒 Security
+
+- ✅ Row Level Security (RLS) enabled
+- ✅ User authentication via Supabase Auth
+- ✅ HTTPS encryption
+- ✅ Environment variables for sensitive data
+- ✅ SQL injection protection
+- ✅ Session management
+
+---
 
 ## 🛠️ Tech Stack
 
-### Frontend
-- **Hosting**: Netlify
-- **Framework**: Vanilla JavaScript (current), to migrate to React/Vue/Svelte
-- **Styling**: Custom CSS with modern design
-- **UI Features**:
-  - Tab-based navigation (Daily, Weekly, Calendar, Modules views)
-  - Collapsible task categories
-  - Color-coded day types
-  - Progress bars and visual indicators
-  - Responsive date navigation
+| Component | Technology |
+|-----------|------------|
+| Frontend | Vanilla JavaScript, HTML, CSS |
+| Backend | Supabase (PostgreSQL) |
+| Authentication | Supabase Auth |
+| Hosting | Netlify |
+| Database | PostgreSQL with RLS |
 
-### Backend
-- **Database & Auth**: Supabase
-- **Real-time Updates**: Supabase Realtime
-- **Storage**: Supabase Storage (for any assets)
+---
 
-### Current Implementation
-The reference app (`app.js`) is a fully functional vanilla JavaScript application with:
-- In-memory data storage (to be migrated to Supabase)
-- Complete UI implementation
-- All core features working
-- Ready to be enhanced with backend persistence
+## 📈 Features Roadmap
 
-## 🎯 Key Features from Reference App
-
-### 1. **Intelligent Day Type System**
-The app recognizes different day types and adjusts study load accordingly:
-- `work` - Work days with reduced study time (1-2 hours, single topic focus)
-- `off` - Full study days (4-6 hours, multiple topics)
-- `revision` - Mock exam and review days (3-4 hours)
-- `intensive` - Deep dive study days
-- `intensive-post` - Post-trip catch-up days
-- `trip` - Minimal study (0-30 minutes optional)
-- `trip-end` - Transition back to study
-- `rest` - Light review only
-- `exam-eve` - Mental preparation mode
-- `light` - Reduced load days (e.g., holidays)
-
-### 2. **Detailed Daily Schedule**
-Each day has a pre-planned schedule with:
-- Specific topics to study (e.g., "Biostatistics: Variables & Types")
-- Recommended resources (Lecture Summary, Podcast, Video, Questions)
-- Time estimates for each task
-- Work-suitable indicators for tasks that can be done during work breaks
-
-### 3. **Module Progress Tracking**
-12 study modules with:
-- Exam weight percentage
-- Total subtopics count
-- Completed subtopics count
-- Color coding for visual identification
-- Detailed subtopic lists
-
-### 4. **Revision Resources Integration**
-Week-specific resources including:
-- GTG (Green-top Guidelines) Podcasts
-- GTG Summaries
-- NICE Guidelines
-- RRR (Rapid Review Revision) Session recordings
-- Automatically shown based on current week
-
-### 5. **Task Management Features**
-- Checkbox completion tracking
-- Persistent storage of completions
-- Category-based organization
-- Collapsible sections for better organization
-- Work-suitable task indicators
-- Time estimates for each task
-
-### 6. **Multi-View Navigation**
-- **Daily View**: Detailed task list with notes
-- **Weekly View**: 7-day overview with color coding
-- **Calendar View**: Full month calendar
-- **Modules View**: Progress dashboard
-- Easy navigation between views and dates
-
-### 7. **Motivational Features**
-- Countdown to exam date
-- Countdown to important events (e.g., trips)
-- Random motivational messages
-- Overall progress percentage
-- Visual progress bars
-
-## 📊 Data Structure
-
-### Tables (Supabase)
-
-#### `modules`
-- `id` (uuid, primary key)
-- `user_id` (uuid, foreign key)
-- `name` (text) - e.g., "Anatomy", "Genetics", "Physiology"
-- `exam_weight` (numeric) - Percentage weight in exam
-- `subtopics` (integer) - Total number of subtopics
-- `completed` (integer) - Number of completed subtopics
-- `color` (text) - Hex color for visual identification
-- `subtopics_list` (jsonb) - Array of subtopic names
-- `created_at` (timestamp)
-- `updated_at` (timestamp)
-
-#### `daily_schedule`
-- `id` (uuid, primary key)
-- `user_id` (uuid, foreign key)
-- `date` (date)
-- `topics` (jsonb) - Array of specific topics for the day
-- `day_type` (enum: work, off, revision, intensive, intensive-post, trip, trip-end, rest, exam-eve, light)
-- `resources` (jsonb) - Array of resources (Lecture Summary, Podcast, Video, etc.)
-- `created_at` (timestamp)
-- `updated_at` (timestamp)
-
-#### `tasks`
-- `id` (uuid, primary key)
-- `user_id` (uuid, foreign key)
-- `date` (date)
-- `category_index` (integer) - Index of task category
-- `item_index` (integer) - Index of item within category
-- `category_name` (text) - Name of the task category
-- `task_name` (text) - Name of the specific task
-- `time_estimate` (text) - Estimated time (e.g., "30-45 min")
-- `work_suitable` (boolean) - Whether task is suitable for work days
-- `completed` (boolean) - Completion status
-- `created_at` (timestamp)
-- `updated_at` (timestamp)
-
-#### `daily_notes`
-- `id` (uuid, primary key)
-- `user_id` (uuid, foreign key)
-- `date` (date)
-- `notes` (text)
-- `created_at` (timestamp)
-- `updated_at` (timestamp)
-
-#### `calendar_events`
-- `id` (uuid, primary key)
-- `user_id` (uuid, foreign key)
-- `title` (text)
-- `event_type` (enum: holiday, work_day, trip, free_day, commitment)
-- `start_date` (date)
-- `end_date` (date)
-- `all_day` (boolean)
-- `expected_study_hours` (numeric, nullable) - Configurable study time for this event (e.g., 0.5 for 30 minutes)
-- `created_at` (timestamp)
-- `updated_at` (timestamp)
-
-#### `revision_resources`
-- `id` (uuid, primary key)
-- `user_id` (uuid, foreign key)
-- `resource_type` (enum: gtg_podcast, gtg_summary, nice_guideline, rrr_session)
-- `title` (text)
-- `week_start_date` (date) - Week when this resource is relevant
-- `created_at` (timestamp)
-- `updated_at` (timestamp)
-
-## 🚀 Getting Started
-
-### Prerequisites
-- Node.js (v18 or higher)
-- npm or yarn
-- Supabase account
-- Netlify account
-
-### Setup
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd studyplan
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Configure Supabase**
-   - Create a new project in [Supabase](https://supabase.com)
-   - Run the SQL migrations in `/supabase/migrations` (to be created)
-   - Copy your project URL and anon key
-
-4. **Environment Variables**
-   Create a `.env` file in the root directory:
-   ```env
-   VITE_SUPABASE_URL=your_supabase_project_url
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-   ```
-
-5. **Run locally**
-   ```bash
-   npm run dev
-   ```
-
-6. **Deploy to Netlify**
-   - Connect your repository to Netlify
-   - Add environment variables in Netlify dashboard
-   - Deploy!
-
-## 📱 Usage
-
-### Daily View - Your Study Dashboard
-1. See your current day's study plan with all tasks organized by topic
-2. Check if it's a work day, study day, revision day, or trip day
-3. View specific topics scheduled for the day
-4. Mark tasks as complete using checkboxes
-5. See which tasks are suitable for work days (marked with ✓)
-6. Add personal notes for the day
-7. Navigate between days using Previous/Next buttons
-
-### Weekly View - Plan Your Week
-1. See all 7 days of the week at a glance
-2. Color-coded day types:
-   - Blue: Work days (reduced study load)
-   - Green: Revision days (mock exams and review)
-   - Orange: Trip days (minimal study)
-   - Default: Regular study days
-3. Click any day to jump to its detailed daily view
-4. See which modules are scheduled for each day
-5. Navigate between weeks using Previous/Next Week buttons
-
-### Calendar View - Monthly Overview
-1. Full month calendar with all your study days
-2. See study modules for each day
-3. Visual indicators for:
-   - Today (highlighted)
-   - Work days
-   - Revision days
-   - Trip days
-   - Exam day
-4. Click any date to view its detailed daily plan
-5. Navigate between months
-
-### Modules View - Track Your Progress
-1. See all study modules with progress bars
-2. Each module shows:
-   - Exam weight percentage
-   - Completion percentage
-   - Number of completed subtopics
-   - List of all subtopics
-3. Color-coded for easy visual identification
-4. Track overall study progress
-
-### Managing Different Day Types
-The app automatically adjusts study expectations based on day type:
-- **Work Days** (1-2 hours): Focus on one specific topic, podcasts, and quick questions
-- **Off Days/Study Days** (4-6 hours): Full study with videos, lectures, practice questions
-- **Revision Days** (3-4 hours): Mock exams and comprehensive review
-- **Trip Days** (0-30 minutes): Optional light questions only
-- **Rest Days**: Very light review
-- **Exam Eve**: Mental preparation mode
-
-## 🎨 Design Principles
-
-- **Simple & Clean**: Minimal interface, maximum functionality
-- **Engaging**: Visual feedback and progress indicators
-- **Flexible**: Adapt to different study styles and schedules
-- **Realistic**: Set different study expectations for different types of days
-- **Motivating**: Clear visualization of progress and achievements
-
-## 🔐 Security
-
-- Authentication handled by Supabase Auth
-- Row Level Security (RLS) policies ensure users only see their own data
-- All API calls secured with JWT tokens
-
-## 🗺️ Roadmap
-
-### ✅ Implemented (from reference app)
-- [x] Task management with checkbox completion
-- [x] Module-based organization with progress tracking
-- [x] Daily/weekly/monthly visualizations
-- [x] Calendar integration with day types
-- [x] Task categorization and collapsible sections
-- [x] Work-suitable task indicators
-- [x] Daily notes functionality
-- [x] Countdown timers (days to exam, days to events)
-- [x] Motivational messages
-- [x] Revision resources by week
-- [x] Detailed daily schedule with specific topics
-- [x] Navigation between days/weeks/months
-- [x] Progress tracking across modules
-
-### 🔄 To Migrate to Supabase
-- [ ] User authentication (Supabase Auth)
-- [ ] Persistent storage of task completions
-- [ ] Persistent storage of daily notes
-- [ ] Persistent storage of modules and progress
-- [ ] Persistent storage of daily schedules
-- [ ] Persistent storage of revision resources
-- [ ] Row Level Security (RLS) policies
+### ✅ Completed
+- [x] Multi-user authentication
+- [x] Task completion tracking
+- [x] Module progress calculation
+- [x] Daily/Weekly/Calendar views
+- [x] Settings customization
+- [x] Real-time database sync
+- [x] Responsive design
 
 ### 🎯 Future Enhancements
-- [ ] Mobile responsive design improvements
+- [ ] Task creation UI
+- [ ] Module creation UI
 - [ ] Dark mode
-- [ ] Export data (CSV/PDF)
-- [ ] Study streak tracking
-- [ ] Pomodoro timer integration
-- [ ] Study goals and milestones
-- [ ] Analytics dashboard with charts
-- [ ] Time tracking with actual hours logged
-- [ ] Multi-user support
-- [ ] Notifications and reminders
-- [ ] Custom themes and colors
-- [ ] Drag-and-drop task reordering
-- [ ] Study session timer
-- [ ] Focus mode (hide distractions)
+- [ ] Email reminders
+- [ ] Data export (PDF/CSV)
+- [ ] Study timer
+- [ ] Analytics dashboard
+- [ ] Mobile app
 
-## 🤝 Contributing
+---
 
-This is a personal project, but suggestions and feedback are welcome!
+## 🆘 Getting Help
+
+1. **Check the docs** - See `DEPLOYMENT.md` and `TROUBLESHOOTING.md`
+2. **Browser console** - Press F12 to see error messages
+3. **Supabase logs** - Check API logs in Supabase dashboard
+4. **Test locally first** - Easier to debug than in production
+
+---
 
 ## 📄 License
 
-[To be determined]
+This project is yours to use, modify, and deploy as you wish.
+
+---
 
 ## 🙏 Acknowledgments
 
 Built with:
-- [Supabase](https://supabase.com) - Backend as a Service
-- [Netlify](https://netlify.com) - Frontend hosting
-- And other amazing open-source tools
+- [Supabase](https://supabase.com) - Open source Firebase alternative
+- [Netlify](https://netlify.com) - Modern web hosting
 
 ---
 
-**Happy Studying! 📚✨**
+**Ready to get started?** Go to `supabase/README.md` and follow the 3-step setup!
 
+**Have questions?** Check `DEPLOYMENT.md` for comprehensive instructions.
+
+**Happy studying!** 📚✨

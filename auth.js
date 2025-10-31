@@ -46,8 +46,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     if (error) throw error;
 
     currentUser = data.user;
-    await initializeApp();
-    showMainApp();
+    await beginInitializationIfNeeded();
 
   } catch (error) {
     errorDiv.textContent = error.message || 'Login failed. Please try again.';
@@ -121,16 +120,41 @@ async function handleLogout() {
   }
 }
 
+// Flag to prevent duplicate initialization
+let isInitializing = false;
+let hasInitialized = false;
+
+async function beginInitializationIfNeeded() {
+  if (isInitializing || hasInitialized) {
+    console.log('Initialization skipped (isInitializing or hasInitialized)');
+    return;
+  }
+  isInitializing = true;
+  try {
+    console.log('Starting app initialization...');
+    await initializeApp();
+    console.log('App initialized successfully');
+    showMainApp();
+    hasInitialized = true;
+  } catch (error) {
+    console.error('Failed to initialize app:', error);
+    alert('Failed to load app: ' + error.message + '\n\nCheck console for details.');
+  } finally {
+    isInitializing = false;
+  }
+}
+
 // Check if user is already logged in on page load
 supabase.auth.onAuthStateChange(async (event, session) => {
   console.log('Auth state changed:', event);
 
   if (session && session.user) {
     currentUser = session.user;
-    await initializeApp();
-    showMainApp();
+    console.log('User authenticated:', currentUser.email);
+    await beginInitializationIfNeeded();
   } else {
     currentUser = null;
+    hasInitialized = false;
     showAuthScreen();
   }
 });
@@ -152,16 +176,3 @@ function showMainApp() {
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('mainApp').style.display = 'block';
 }
-
-// Check session on page load
-(async () => {
-  const { data: { session } } = await supabase.auth.getSession();
-
-  if (session && session.user) {
-    currentUser = session.user;
-    await initializeApp();
-    showMainApp();
-  } else {
-    showAuthScreen();
-  }
-})();

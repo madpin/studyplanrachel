@@ -73,6 +73,14 @@
                             <div class="stat-value" id="overallProgress">0%</div>
                             <div class="stat-label">Overall Progress</div>
                         </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="sbaProgress">0%</div>
+                            <div class="stat-label">SBA Progress</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="telegramProgress">0</div>
+                            <div class="stat-label">Telegram Q's</div>
+                        </div>
                         <div class="stat-card catch-up-stat">
                             <div class="stat-value" id="catchUpCount">0</div>
                             <div class="stat-label">Catch-up Tasks</div>
@@ -101,6 +109,12 @@
                 </button>
                 <button class="tab-btn" data-view="modules" onclick="switchView('modules')">
                     Module Progress
+                </button>
+                <button class="tab-btn" data-view="sba" onclick="switchView('sba')">
+                    SBA Tests
+                </button>
+                <button class="tab-btn" data-view="telegram" onclick="switchView('telegram')">
+                    Telegram Q
                 </button>
             </nav>
 
@@ -194,7 +208,132 @@
                         <!-- Modules will be populated here -->
                     </div>
                 </section>
+
+                <!-- SBA Tests View -->
+                <section id="sbaView" class="view-section" style="display: none;">
+                    <div class="view-header">
+                        <h2>SBA Tests Management</h2>
+                        <div class="header-actions-inline">
+                            <button onclick="showAddSBAModal()" class="btn btn--primary btn--sm">+ Add SBA Test</button>
+                            <button onclick="showSBABulkUploadModal()" class="btn btn--secondary btn--sm">📤 Bulk Upload</button>
+                            <button onclick="showSBAPlaceholderModal()" class="btn btn--outline btn--sm">📅 Create Placeholders</button>
+                        </div>
+                    </div>
+                    
+                    <div class="sba-container">
+                        <div class="sba-tests-list">
+                            <h3>SBA Test Definitions</h3>
+                            <div id="sbaTestsList">
+                                <!-- SBA tests will be populated here -->
+                            </div>
+                        </div>
+                        
+                        <div class="sba-schedule-section">
+                            <h3>SBA Schedule</h3>
+                            <div class="date-range-selector">
+                                <label>From:</label>
+                                <input type="date" id="sbaScheduleStartDate" class="form-control">
+                                <label>To:</label>
+                                <input type="date" id="sbaScheduleEndDate" class="form-control">
+                                <button onclick="loadSBAScheduleView()" class="btn btn--sm btn--primary">Load</button>
+                            </div>
+                            <div id="sbaScheduleContent">
+                                <!-- SBA schedule will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Telegram Questions View -->
+                <section id="telegramView" class="view-section" style="display: none;">
+                    <div class="view-header">
+                        <h2>Telegram Questions Management</h2>
+                        <div class="header-actions-inline">
+                            <button onclick="showAddTelegramModal()" class="btn btn--primary btn--sm">+ Add Question</button>
+                            <button onclick="showTelegramBulkUploadModal()" class="btn btn--secondary btn--sm">📤 Bulk Upload</button>
+                            <button onclick="showTelegramPlaceholderModal()" class="btn btn--outline btn--sm">📅 Create Placeholders</button>
+                        </div>
+                    </div>
+                    
+                    <div class="telegram-filters">
+                        <div class="filter-group">
+                            <label>From:</label>
+                            <input type="date" id="telegramStartDate" class="form-control">
+                        </div>
+                        <div class="filter-group">
+                            <label>To:</label>
+                            <input type="date" id="telegramEndDate" class="form-control">
+                        </div>
+                        <div class="filter-group">
+                            <label>Source:</label>
+                            <select id="telegramSourceFilter" class="form-control">
+                                <option value="">All Sources</option>
+                                <option value="MRCOG Study Group">MRCOG Study Group</option>
+                                <option value="MRCOG Intensive Hour">MRCOG Intensive Hour</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Status:</label>
+                            <select id="telegramStatusFilter" class="form-control">
+                                <option value="">All</option>
+                                <option value="completed">Completed</option>
+                                <option value="pending">Pending</option>
+                            </select>
+                        </div>
+                        <button onclick="loadTelegramQuestionsView()" class="btn btn--sm btn--primary">Filter</button>
+                    </div>
+                    
+                    <div id="telegramQuestionsContent">
+                        <!-- Telegram questions will be populated here -->
+                    </div>
+                </section>
             </main>
+        </div>
+    </div>
+
+    <!-- Onboarding Modal (First Time User) -->
+    <div id="onboardingModal" class="modal" style="display: none;">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>Welcome! Let's Set Up Your Study Plan</h3>
+            </div>
+            <form id="onboardingForm" class="modal-body">
+                <div class="onboarding-section">
+                    <h4>📅 Configure Your Dates</h4>
+                    <div class="form-group">
+                        <label class="form-label">Exam Date</label>
+                        <input type="date" id="onboardingExamDate" class="form-control" required>
+                        <small class="form-help">When is your exam?</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Trip/Break Start Date (optional)</label>
+                        <input type="date" id="onboardingTripStart" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Trip/Break End Date (optional)</label>
+                        <input type="date" id="onboardingTripEnd" class="form-control">
+                        <small class="form-help">Any scheduled breaks or trips?</small>
+                    </div>
+                </div>
+
+                <div class="onboarding-section">
+                    <h4>📚 Select Modules to Study</h4>
+                    <p class="section-description">Choose which modules you want to include in your study plan. You can always add more later.</p>
+                    <div class="module-selector">
+                        <div class="module-selector-header">
+                            <button type="button" class="btn btn--sm btn--outline" onclick="selectAllModules()">Select All</button>
+                            <button type="button" class="btn btn--sm btn--outline" onclick="deselectAllModules()">Deselect All</button>
+                        </div>
+                        <div id="moduleCheckboxes" class="module-checkboxes">
+                            <!-- Will be populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn--primary btn--large">Start My Study Journey! 🚀</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -223,6 +362,145 @@
                     <button type="submit" class="btn btn--primary">Save Settings</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Add SBA Test Modal -->
+    <div id="addSBAModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="sbaModalTitle">Add SBA Test</h3>
+                <button onclick="closeSBAModal()" class="modal-close">&times;</button>
+            </div>
+            <form id="sbaForm" class="modal-body">
+                <input type="hidden" id="sbaEditId">
+                <div class="form-group">
+                    <label class="form-label">Test Key (unique identifier)</label>
+                    <input type="text" id="sbaTestKey" class="form-control" required placeholder="e.g., biostatistics">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Test Name</label>
+                    <input type="text" id="sbaName" class="form-control" required placeholder="e.g., Biostatistics SBA">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Total Days</label>
+                    <input type="number" id="sbaTotalDays" class="form-control" required min="1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Reading Time</label>
+                    <input type="text" id="sbaReadingTime" class="form-control" required placeholder="e.g., 1h 30m">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Average Time per Day</label>
+                    <input type="text" id="sbaAvgTime" class="form-control" required placeholder="e.g., 15-20 min">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" onclick="closeSBAModal()" class="btn btn--outline">Cancel</button>
+                    <button type="submit" class="btn btn--primary">Save SBA Test</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Telegram Question Modal -->
+    <div id="addTelegramModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="telegramModalTitle">Add Telegram Question</h3>
+                <button onclick="closeTelegramModal()" class="modal-close">&times;</button>
+            </div>
+            <form id="telegramForm" class="modal-body">
+                <input type="hidden" id="telegramEditId">
+                <div class="form-group">
+                    <label class="form-label">Date</label>
+                    <input type="date" id="telegramQuestionDate" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Question Text</label>
+                    <textarea id="telegramQuestionText" class="form-control" rows="3" required placeholder="Enter the question..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Source</label>
+                    <select id="telegramQuestionSource" class="form-control">
+                        <option value="">Select source...</option>
+                        <option value="MRCOG Study Group">MRCOG Study Group</option>
+                        <option value="MRCOG Intensive Hour">MRCOG Intensive Hour</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" onclick="closeTelegramModal()" class="btn btn--outline">Cancel</button>
+                    <button type="submit" class="btn btn--primary">Save Question</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bulk Upload Modal -->
+    <div id="bulkUploadModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="bulkUploadTitle">Bulk Upload</h3>
+                <button onclick="closeBulkUploadModal()" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Upload Type</label>
+                    <select id="bulkUploadType" class="form-control">
+                        <option value="sba">SBA Schedule</option>
+                        <option value="telegram">Telegram Questions</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">JSON Data</label>
+                    <textarea id="bulkUploadJSON" class="form-control" rows="10" placeholder='[{"date":"2025-11-01","sba_name":"Test 1"}]'></textarea>
+                    <small class="form-help">Paste your JSON data here. See format guide below.</small>
+                </div>
+                <div class="json-format-guide">
+                    <strong>Format Guide:</strong>
+                    <p>For SBA:</p>
+                    <code>[{"date":"2025-11-01","sba_name":"Biostatistics SBA Day 1","is_placeholder":false}]</code>
+                    <p>For Telegram:</p>
+                    <code>[{"date":"2025-11-01","question_text":"Sample question","source":"MRCOG Study Group"}]</code>
+                </div>
+                <div id="bulkUploadResult" class="upload-result"></div>
+                <div class="modal-actions">
+                    <button type="button" onclick="closeBulkUploadModal()" class="btn btn--outline">Cancel</button>
+                    <button type="button" onclick="processBulkUpload()" class="btn btn--primary">Upload</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Placeholder Creation Modal -->
+    <div id="placeholderModal" class="modal" style="display: none;">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3 id="placeholderModalTitle">Create Placeholders</h3>
+                <button onclick="closePlaceholderModal()" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="placeholderType">
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="excludeWeekends" checked>
+                        <span>Exclude Weekends</span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Select Dates (click to select/deselect)</label>
+                    <div id="placeholderCalendar" class="placeholder-calendar">
+                        <!-- Calendar will be generated here -->
+                    </div>
+                </div>
+                <div id="selectedDatesDisplay" class="selected-dates-display">
+                    <strong>Selected Dates:</strong> <span id="selectedDatesCount">0</span>
+                </div>
+                <div id="placeholderResult" class="upload-result"></div>
+                <div class="modal-actions">
+                    <button type="button" onclick="closePlaceholderModal()" class="btn btn--outline">Cancel</button>
+                    <button type="button" onclick="createPlaceholdersFromModal()" class="btn btn--primary">Create Placeholders</button>
+                </div>
+            </div>
         </div>
     </div>
 

@@ -1,0 +1,110 @@
+{
+  "sba_schedule_example": [
+    {
+      "date": "2025-11-01",
+      "sba_name": "Biostatistics SBA Day 1",
+      "is_placeholder": false,
+      "completed": false
+    },
+    {
+      "date": "2025-11-02",
+      "sba_name": "Biostatistics SBA Day 2",
+      "is_placeholder": false,
+      "completed": false
+    },
+    {
+      "date": "2025-11-03",
+      "sba_name": "Biostatistics SBA Day 3",
+      "is_placeholder": false,
+      "completed": false
+    }
+  ],
+  "telegram_questions_example": [
+    {
+      "date": "2025-11-01",
+      "question_text": "What is the first-line management of postpartum hemorrhage?",
+      "source": "MRCOG Study Group",
+      "is_placeholder": false,
+      "completed": false
+    },
+    {
+      "date": "2025-11-01",
+      "question_text": "Calculate the odds ratio for the given 2x2 table.",
+      "source": "MRCOG Intensive Hour",
+      "is_placeholder": false,
+      "completed": false
+    }
+  ],
+  "sba_placeholder_example": [
+    {
+      "date": "2025-12-01",
+      "sba_name": "TBD - Placeholder",
+      "is_placeholder": true,
+      "completed": false
+    },
+    {
+      "date": "2025-12-02",
+      "sba_name": "TBD - Placeholder",
+      "is_placeholder": true,
+      "completed": false
+    }
+  ],
+  "telegram_placeholder_example": [
+    {
+      "date": "2025-12-01",
+      "question_text": "Placeholder - to be added",
+      "source": null,
+      "is_placeholder": true,
+      "completed": false
+    }
+  ],
+  "full_week_sba_schedule": [
+    {
+      "date": "2025-11-04",
+      "sba_name": "Anatomy SBA Day 1",
+      "is_placeholder": false,
+      "completed": false
+    },
+    {
+      "date": "2025-11-05",
+      "sba_name": "Anatomy SBA Day 2",
+      "is_placeholder": false,
+      "completed": false
+    },
+    {
+      "date": "2025-11-06",
+      "sba_name": "Anatomy SBA Day 3",
+      "is_placeholder": false,
+      "completed": false
+    },
+    {
+      "date": "2025-11-07",
+      "sba_name": "Anatomy SBA Day 4",
+      "is_placeholder": false,
+      "completed": false
+    },
+    {
+      "date": "2025-11-08",
+      "sba_name": "Anatomy SBA Day 5",
+      "is_placeholder": false,
+      "completed": false
+    }
+  ],
+  "notes": {
+    "date_format": "Always use YYYY-MM-DD format",
+    "is_placeholder": "Set to true for placeholder entries that can be easily deleted",
+    "completed": "Set to true if already completed, false otherwise",
+    "source_options": ["MRCOG Study Group", "MRCOG Intensive Hour", null],
+    "sba_name": "Use descriptive names matching your study materials",
+    "question_text": "Full question text, can be multiple lines",
+    "required_fields": {
+      "sba_schedule": ["date", "sba_name"],
+      "telegram_questions": ["date", "question_text"]
+    },
+    "optional_fields": {
+      "sba_schedule": ["is_placeholder", "completed"],
+      "telegram_questions": ["source", "is_placeholder", "completed"]
+    }
+  }
+}
+
