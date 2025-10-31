@@ -157,6 +157,13 @@
                         <!-- Daily tasks will be populated here -->
                     </div>
 
+                    <div class="revision-resources-section" id="revisionResourcesSection" style="display: none;">
+                        <h3>📚 Revision Resources for This Week</h3>
+                        <div id="revisionResourcesContent">
+                            <!-- Revision resources will be populated here -->
+                        </div>
+                    </div>
+
                     <div class="notes-section">
                         <h3>Daily Notes</h3>
                         <textarea id="dailyNotes" placeholder="Add any notes about today's study session..."></textarea>
@@ -299,6 +306,27 @@
             </div>
             <form id="onboardingForm" class="modal-body">
                 <div class="onboarding-section">
+                    <h4>📋 Study Plan Template</h4>
+                    <p class="section-description">Choose a pre-defined template or create your own custom schedule.</p>
+                    <div class="template-selector">
+                        <label class="radio-label">
+                            <input type="radio" name="planTemplate" value="mrcog-jan-2026" id="templateMrcog" checked onchange="handleTemplateChange()">
+                            <span class="radio-label-content">
+                                <strong>MRCOG Jan 2026 Comprehensive Template</strong><br>
+                                <small>Pre-defined schedule from Nov 1, 2025 to Jan 14, 2026 with daily topics, SBA tests, and revision resources. Fixed dates for optimal planning.</small>
+                            </span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="planTemplate" value="custom" id="templateCustom" onchange="handleTemplateChange()">
+                            <span class="radio-label-content">
+                                <strong>Custom Schedule</strong><br>
+                                <small>Generate a basic schedule based on your selected dates and modules. Flexible dates for personalized planning.</small>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="onboarding-section" id="datesSection">
                     <h4>📅 Configure Your Dates</h4>
                     <div class="form-group">
                         <label class="form-label">Exam Date</label>
