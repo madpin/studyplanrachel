@@ -240,9 +240,21 @@ async function saveDailyNoteHandler(showFeedback = true) {
 
 function setupNotesAutosave() {
   const notesTextarea = document.getElementById('dailyNotes');
+  const charCounter = document.getElementById('notesCharCounter');
   if (!notesTextarea) return;
   
+  // Character counter
+  const updateCharCounter = () => {
+    if (charCounter) {
+      const count = notesTextarea.value.length;
+      charCounter.textContent = `${count} chars`;
+    }
+  };
+  
+  // Update counter on input
   notesTextarea.addEventListener('input', () => {
+    updateCharCounter();
+    
     if (notesAutosaveTimer) {
       clearTimeout(notesAutosaveTimer);
     }
@@ -251,7 +263,31 @@ function setupNotesAutosave() {
       saveDailyNoteHandler(false);
     }, 800);
   });
+  
+  // Initial counter update
+  updateCharCounter();
 }
+
+// Add note tag helper
+window.addNoteTag = (tag) => {
+  const notesTextarea = document.getElementById('dailyNotes');
+  if (notesTextarea) {
+    const cursorPos = notesTextarea.selectionStart;
+    const textBefore = notesTextarea.value.substring(0, cursorPos);
+    const textAfter = notesTextarea.value.substring(cursorPos);
+    
+    // Add a space before the tag if needed
+    const prefix = textBefore && !textBefore.endsWith(' ') && !textBefore.endsWith('\n') ? ' ' : '';
+    
+    notesTextarea.value = textBefore + prefix + tag + ' ' + textAfter;
+    notesTextarea.focus();
+    notesTextarea.selectionStart = notesTextarea.selectionEnd = cursorPos + prefix.length + tag.length + 1;
+    
+    // Trigger autosave
+    const event = new Event('input', { bubbles: true });
+    notesTextarea.dispatchEvent(event);
+  }
+};
 
 function showOnboardingModal() {
   const modal = document.getElementById('onboardingModal');
@@ -295,7 +331,25 @@ async function submitOnboarding(useTemplate) {
   const currentUser = getCurrentUser();
   
   try {
-    let examDate, tripStart, tripEnd, selectedModules;
+    let examDate, tripStart, tripEnd, selectedModules, maxStudyMinutes, workDaysPattern;
+
+    // Get capacity configuration
+    const maxStudyHours = parseFloat(document.getElementById('onboardingMaxStudyHours').value) || 8;
+    maxStudyMinutes = Math.round(maxStudyHours * 60);
+    
+    const workDayCheckboxes = document.querySelectorAll('input[name="workDay"]:checked');
+    workDaysPattern = {
+      monday: false,
+      tuesday: false,
+      wednesday: false,
+      thursday: false,
+      friday: false,
+      saturday: false,
+      sunday: false
+    };
+    workDayCheckboxes.forEach(cb => {
+      workDaysPattern[cb.value] = true;
+    });
 
     if (useTemplate) {
       examDate = '2026-01-14';
@@ -319,7 +373,7 @@ async function submitOnboarding(useTemplate) {
     UI.showLoading(true);
     closeOnboardingModal();
 
-    await completeOnboarding(currentUser.id, examDate, tripStart, tripEnd, selectedModules, useTemplate);
+    await completeOnboarding(currentUser.id, examDate, tripStart, tripEnd, selectedModules, useTemplate, maxStudyMinutes, workDaysPattern);
 
     if (useTemplate) {
       await seedDailySchedule(currentUser.id, templateDetailedSchedule);
@@ -418,6 +472,13 @@ function setupKeyboardShortcuts() {
           UI.showAddTaskModal();
         }
         break;
+        
+      case 'c':
+        if (document.getElementById('dailyView').style.display !== 'none') {
+          e.preventDefault();
+          UI.showAddTaskModal();
+        }
+        break;
     }
   });
 }
@@ -458,6 +519,315 @@ function showKeyboardShortcutsHelp() {
   document.body.appendChild(modal);
 }
 
+// Setup swipe gestures for mobile navigation
+function setupSwipeGestures() {
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchEndX = 0;
+  let touchEndY = 0;
+  
+  const minSwipeDistance = 50; // Minimum distance for a swipe
+  const maxVerticalDistance = 100; // Maximum vertical movement to still count as horizontal swipe
+  
+  const dailyView = document.getElementById('dailyView');
+  const weeklyView = document.getElementById('weeklyView');
+  
+  if (dailyView) {
+    dailyView.addEventListener('touchstart', (e) => {
+      // Don't interfere with scrolling or form inputs
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+        return;
+      }
+      touchStartX = e.changedTouches[0].screenX;
+      touchStartY = e.changedTouches[0].screenY;
+    }, { passive: true });
+    
+    dailyView.addEventListener('touchend', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+        return;
+      }
+      touchEndX = e.changedTouches[0].screenX;
+      touchEndY = e.changedTouches[0].screenY;
+      handleSwipe('daily');
+    }, { passive: true });
+  }
+  
+  if (weeklyView) {
+    weeklyView.addEventListener('touchstart', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+        return;
+      }
+      touchStartX = e.changedTouches[0].screenX;
+      touchStartY = e.changedTouches[0].screenY;
+    }, { passive: true });
+    
+    weeklyView.addEventListener('touchend', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+        return;
+      }
+      touchEndX = e.changedTouches[0].screenX;
+      touchEndY = e.changedTouches[0].screenY;
+      handleSwipe('weekly');
+    }, { passive: true });
+  }
+  
+  function handleSwipe(viewType) {
+    const horizontalDistance = touchEndX - touchStartX;
+    const verticalDistance = Math.abs(touchEndY - touchStartY);
+    
+    // Only process if horizontal swipe with minimal vertical movement
+    if (Math.abs(horizontalDistance) < minSwipeDistance || verticalDistance > maxVerticalDistance) {
+      return;
+    }
+    
+    if (viewType === 'daily') {
+      if (horizontalDistance > 0) {
+        // Swipe right - previous day
+        UI.changeDay(-1);
+      } else {
+        // Swipe left - next day
+        UI.changeDay(1);
+      }
+    } else if (viewType === 'weekly') {
+      if (horizontalDistance > 0) {
+        // Swipe right - previous week
+        UI.changeWeek(-1);
+      } else {
+        // Swipe left - next week
+        UI.changeWeek(1);
+      }
+    }
+  }
+}
+
+// Generate template preview for onboarding
+window.generateTemplatePreview = function() {
+  const templateRadio = document.getElementById('templateMrcog');
+  const previewContent = document.getElementById('templatePreviewContent');
+  const previewBtn = document.getElementById('previewBtn');
+  
+  if (!templateRadio.checked) {
+    showInfo('Template preview is only available for the MRCOG Jan 2026 template');
+    return;
+  }
+  
+  if (previewContent.style.display === 'none') {
+    // Generate preview
+    const startDate = new Date('2025-11-01');
+    const previewDays = 7; // Show first week
+    
+    let html = '<div class="preview-week">';
+    
+    for (let i = 0; i < previewDays; i++) {
+      const date = new Date(startDate);
+      date.setDate(date.getDate() + i);
+      const dateStr = formatDateISO(date);
+      const dayData = templateDetailedSchedule[dateStr];
+      
+      if (!dayData) continue;
+      
+      const dayName = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const topics = dayData.topics || [];
+      const resources = dayData.resources || [];
+      const type = dayData.type || 'off';
+      
+      // Get SBA for this date
+      const sbaTests = templateSBASchedule[dateStr] || [];
+      
+      html += `
+        <div class="preview-day">
+          <div class="preview-day-header">
+            <strong>${dayName}</strong>
+            <span class="day-type-badge ${type}">${type}</span>
+          </div>
+          <div class="preview-day-content">
+            ${topics.length > 0 ? `
+              <div class="preview-section">
+                <strong>Topics:</strong>
+                <ul>
+                  ${topics.slice(0, 3).map(t => `<li>${t}</li>`).join('')}
+                  ${topics.length > 3 ? `<li><em>...and ${topics.length - 3} more</em></li>` : ''}
+                </ul>
+              </div>
+            ` : ''}
+            ${resources.length > 0 ? `
+              <div class="preview-section">
+                <strong>Resources:</strong> ${resources.join(', ')}
+              </div>
+            ` : ''}
+            ${sbaTests.length > 0 ? `
+              <div class="preview-section">
+                <strong>SBA:</strong> ${sbaTests.join(', ')}
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }
+    
+    html += '</div>';
+    html += `
+      <div class="preview-summary">
+        <p><strong>Summary:</strong></p>
+        <ul>
+          <li>Total study days: ${Object.keys(templateDetailedSchedule).length}</li>
+          <li>Total SBA tests: ${Object.values(templateSBASchedule).flat().length}</li>
+          <li>Study period: Nov 1, 2025 - Jan 14, 2026</li>
+        </ul>
+      </div>
+    `;
+    
+    previewContent.innerHTML = html;
+    previewContent.style.display = 'block';
+    previewBtn.textContent = '🔼 Hide Preview';
+  } else {
+    // Hide preview
+    previewContent.style.display = 'none';
+    previewBtn.textContent = '👁️ Show Preview';
+  }
+};
+
+// Show/hide template preview section based on template selection
+function toggleTemplatePreviewSection() {
+  const templateMrcog = document.getElementById('templateMrcog');
+  const previewSection = document.getElementById('templatePreviewSection');
+  
+  if (templateMrcog && previewSection) {
+    if (templateMrcog.checked) {
+      previewSection.style.display = 'block';
+    } else {
+      previewSection.style.display = 'none';
+    }
+  }
+}
+
+// Initialize drag-and-drop for task categories and tasks
+function initializeDragAndDrop() {
+  // Wait for Sortable.js to load
+  if (typeof Sortable === 'undefined') {
+    setTimeout(initializeDragAndDrop, 100);
+    return;
+  }
+  
+  // Observer to reinitialize drag-and-drop when daily view is re-rendered
+  const dailyContent = document.getElementById('dailyContent');
+  if (!dailyContent) return;
+  
+  const observer = new MutationObserver(() => {
+    setupCategoriesSortable();
+    setupTasksSortable();
+  });
+  
+  observer.observe(dailyContent, { childList: true, subtree: true });
+  
+  // Initial setup
+  setupCategoriesSortable();
+  setupTasksSortable();
+}
+
+// Setup sortable for task categories
+function setupCategoriesSortable() {
+  const dailyContent = document.getElementById('dailyContent');
+  if (!dailyContent) return;
+  
+  const categories = dailyContent.querySelectorAll('.task-category');
+  if (categories.length === 0) return;
+  
+  // Make the container sortable
+  new Sortable(dailyContent, {
+    handle: '.task-category-header',
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    dragClass: 'sortable-drag',
+    onEnd: async function(evt) {
+      // Update sort order in database
+      await updateCategorySortOrder(evt.oldIndex, evt.newIndex);
+    }
+  });
+}
+
+// Setup sortable for tasks within categories
+function setupTasksSortable() {
+  const taskLists = document.querySelectorAll('.task-list');
+  
+  taskLists.forEach((taskList, categoryIndex) => {
+    new Sortable(taskList, {
+      animation: 150,
+      ghostClass: 'sortable-ghost',
+      chosenClass: 'sortable-chosen',
+      dragClass: 'sortable-drag',
+      onEnd: async function(evt) {
+        // Update task sort order in database
+        await updateTaskSortOrder(taskList, evt.oldIndex, evt.newIndex);
+      }
+    });
+  });
+}
+
+// Update category sort order in database
+async function updateCategorySortOrder(oldIndex, newIndex) {
+  try {
+    const dateStr = formatDateISO(getViewingDate());
+    const categories = getTasksForDate(dateStr);
+    
+    // Reorder categories array
+    const [movedCategory] = categories.splice(oldIndex, 1);
+    categories.splice(newIndex, 0, movedCategory);
+    
+    // Update sort_order for all categories
+    const updates = categories.map((category, index) => ({
+      id: category.id,
+      sort_order: index
+    }));
+    
+    // Batch update
+    for (const update of updates) {
+      await supabase
+        .from('task_categories')
+        .update({ sort_order: update.sort_order })
+        .eq('id', update.id);
+    }
+    
+    // Refresh the view
+    await loadTasksForDateHandler(dateStr);
+    UI.renderDailyView();
+  } catch (error) {
+    console.error('Error updating category sort order:', error);
+    showError('Failed to reorder categories');
+  }
+}
+
+// Update task sort order in database
+async function updateTaskSortOrder(taskList, oldIndex, newIndex) {
+  try {
+    const taskItems = Array.from(taskList.querySelectorAll('.task-item'));
+    const taskIds = taskItems.map(item => item.dataset.taskId);
+    
+    // Update sort_order for all tasks in this category
+    const updates = taskIds.map((taskId, index) => ({
+      id: taskId,
+      sort_order: index
+    }));
+    
+    // Batch update
+    for (const update of updates) {
+      await supabase
+        .from('tasks')
+        .update({ sort_order: update.sort_order })
+        .eq('id', update.id);
+    }
+    
+    // Refresh the view
+    const dateStr = formatDateISO(getViewingDate());
+    await loadTasksForDateHandler(dateStr);
+    UI.renderDailyView();
+  } catch (error) {
+    console.error('Error updating task sort order:', error);
+    showError('Failed to reorder tasks');
+  }
+}
+
 function setupEventListeners() {
   const saveNotesBtn = document.getElementById('saveNotesBtn');
   if (saveNotesBtn) {
@@ -465,6 +835,43 @@ function setupEventListeners() {
   }
   
   setupNotesAutosave();
+  
+  // Template selection toggle for preview
+  const templateRadios = document.querySelectorAll('input[name="planTemplate"]');
+  templateRadios.forEach(radio => {
+    radio.addEventListener('change', toggleTemplatePreviewSection);
+  });
+  
+  // Initialize drag-and-drop for daily view
+  initializeDragAndDrop();
+  
+  // Work-suitable filter
+  const workSuitableFilter = document.getElementById('workSuitableFilter');
+  if (workSuitableFilter) {
+    workSuitableFilter.addEventListener('change', (e) => {
+      localStorage.setItem('work-suitable-filter', e.target.checked);
+      UI.renderDailyView();
+    });
+  }
+  
+  // FAB menu toggle
+  const fabMain = document.getElementById('fabMain');
+  const fabMenu = document.getElementById('fabMenu');
+  if (fabMain && fabMenu) {
+    fabMain.addEventListener('click', () => {
+      const isOpen = fabMenu.style.display === 'flex';
+      fabMenu.style.display = isOpen ? 'none' : 'flex';
+      fabMain.classList.toggle('open');
+    });
+    
+    // Close FAB menu when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.fab-container')) {
+        fabMenu.style.display = 'none';
+        fabMain.classList.remove('open');
+      }
+    });
+  }
 
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -526,8 +933,154 @@ window.handleSBAScheduleToggle = UI.handleSBAScheduleToggle;
 window.handleTelegramToggle = UI.handleTelegramToggle;
 window.deleteSBAScheduleEntryConfirm = UI.deleteSBAScheduleEntryConfirm;
 window.deleteTelegramQuestionConfirm = UI.deleteTelegramQuestionConfirm;
+window.showSBAPlaceholderModal = UI.showSBAPlaceholderModal;
+window.showTelegramPlaceholderModal = UI.showTelegramPlaceholderModal;
+window.closePlaceholderModal = UI.closePlaceholderModal;
 window.editSBAScheduleEntry = UI.editSBAScheduleEntry;
+
+// Toggle upload format (JSON/CSV)
+window.toggleUploadFormat = function() {
+  const formatRadios = document.querySelectorAll('input[name="uploadFormat"]');
+  let selectedFormat = 'json';
+  formatRadios.forEach(radio => {
+    if (radio.checked) selectedFormat = radio.value;
+  });
+  
+  const jsonSection = document.getElementById('jsonUploadSection');
+  const csvSection = document.getElementById('csvUploadSection');
+  const jsonGuide = document.getElementById('jsonFormatGuide');
+  const csvGuide = document.getElementById('csvFormatGuide');
+  
+  if (selectedFormat === 'csv') {
+    jsonSection.style.display = 'none';
+    csvSection.style.display = 'block';
+    jsonGuide.style.display = 'none';
+    csvGuide.style.display = 'block';
+  } else {
+    jsonSection.style.display = 'block';
+    csvSection.style.display = 'none';
+    jsonGuide.style.display = 'block';
+    csvGuide.style.display = 'none';
+  }
+};
+
+// Parse CSV to JSON
+window.parseCSVtoJSON = function(csvText) {
+  const lines = csvText.trim().split('\n');
+  if (lines.length < 2) {
+    throw new Error('CSV must have at least a header row and one data row');
+  }
+  
+  // Parse header
+  const headers = lines[0].split(',').map(h => h.trim());
+  
+  // Parse data rows
+  const result = [];
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue; // Skip empty lines
+    
+    const values = lines[i].split(',').map(v => v.trim());
+    if (values.length !== headers.length) {
+      console.warn(`Row ${i+1} has ${values.length} columns, expected ${headers.length}. Skipping.`);
+      continue;
+    }
+    
+    const obj = {};
+    headers.forEach((header, index) => {
+      let value = values[index];
+      
+      // Convert boolean strings
+      if (value.toLowerCase() === 'true') value = true;
+      else if (value.toLowerCase() === 'false') value = false;
+      // Remove quotes if present
+      else if (value.startsWith('"') && value.endsWith('"')) {
+        value = value.slice(1, -1);
+      }
+      
+      obj[header] = value;
+    });
+    
+    result.push(obj);
+  }
+  
+  return result;
+};
+
 window.editTelegramQuestionFromDaily = UI.editTelegramQuestionFromDaily;
+
+// Toggle subtopic list visibility
+window.toggleSubtopicList = function(moduleId) {
+  const listEl = document.getElementById(`subtopics-${moduleId}`);
+  const toggleEl = document.getElementById(`toggle-subtopics-${moduleId}`);
+  
+  if (listEl.classList.contains('collapsed')) {
+    listEl.classList.remove('collapsed');
+    toggleEl.textContent = '▲ Hide All';
+  } else {
+    listEl.classList.add('collapsed');
+    toggleEl.textContent = '▼ Show All';
+  }
+};
+
+// Toggle subtopic completion
+window.toggleSubtopicCompletion = async function(moduleId, subtopicName, completed) {
+  const currentUser = getCurrentUser();
+  if (!currentUser) return;
+  
+  try {
+    UI.showLoading(true);
+    
+    // Upsert the subtopic progress
+    const { error } = await supabase
+      .from('subtopic_progress')
+      .upsert({
+        user_id: currentUser.id,
+        module_id: moduleId,
+        subtopic_name: subtopicName,
+        completed: completed,
+        completed_at: completed ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'user_id,module_id,subtopic_name'
+      });
+    
+    if (error) throw error;
+    
+    // Update the module's completed count
+    const { data: progressData, error: countError } = await supabase
+      .from('subtopic_progress')
+      .select('id')
+      .eq('user_id', currentUser.id)
+      .eq('module_id', moduleId)
+      .eq('completed', true);
+    
+    if (countError) throw countError;
+    
+    const completedCount = progressData ? progressData.length : 0;
+    
+    // Update module completed count
+    const { error: updateError } = await supabase
+      .from('modules')
+      .update({ completed: completedCount, updated_at: new Date().toISOString() })
+      .eq('id', moduleId)
+      .eq('user_id', currentUser.id);
+    
+    if (updateError) throw updateError;
+    
+    // Refresh the modules view
+    await UI.renderModulesView();
+    UI.showLoading(false);
+    
+    if (completed) {
+      showSuccess(`Subtopic marked as complete!`);
+    }
+  } catch (error) {
+    console.error('Error updating subtopic progress:', error);
+    showError('Failed to update subtopic: ' + error.message);
+    UI.showLoading(false);
+  }
+};
+
 window.closeSBAModal = UI.closeSBAModal;
 window.saveSBATest = UI.saveSBATest;
 window.editSBATest = UI.editSBATest;
@@ -592,13 +1145,14 @@ async function loadTasksForDateHandler(date) {
 
 // Placeholder functions for features
 window.showAddSBAModal = () => UI.showAddSBAModal();
+window.showAddSBAScheduleEntry = (date) => UI.showAddSBAScheduleEntry(date);
 window.showSBABulkUploadModal = () => UI.showSBABulkUploadModal();
 window.showSBAPlaceholderModal = () => UI.showSBAPlaceholderModal();
 window.loadSBAScheduleView = () => UI.loadSBAScheduleView();
 window.showAddTelegramModal = () => UI.showAddTelegramModal();
 window.showTelegramBulkUploadModal = () => UI.showTelegramBulkUploadModal();
 window.showTelegramPlaceholderModal = () => alert('Telegram placeholder modal coming soon in modular version!');
-window.loadTelegramQuestionsView = () => UI.renderTelegramView();
+window.loadTelegramQuestionsView = () => UI.loadTelegramQuestionsView();
 window.closeTelegramModal = UI.closeTelegramModal;
 window.saveTelegramQuestion = UI.saveTelegramQuestion;
 window.editTelegramQuestion = UI.editTelegramQuestion;
@@ -611,5 +1165,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initializeTheme();
   setupEventListeners();
   setupKeyboardShortcuts();
+  setupSwipeGestures();
   initializeAuth();
 });

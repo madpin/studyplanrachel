@@ -9,7 +9,7 @@ export function validateSBABulkUpload(jsonData) {
     valid: true,
     errors: [],
     preview: [],
-    summary: { total: 0, valid: 0, errors: 0 }
+    summary: { total: 0, valid: 0, errors: 0, duplicates: 0 }
   };
   
   if (!Array.isArray(jsonData)) {
@@ -19,6 +19,10 @@ export function validateSBABulkUpload(jsonData) {
   }
   
   results.summary.total = jsonData.length;
+  
+  // Track duplicates: key is "date|sba_name"
+  const seen = new Map();
+  const duplicateIndexes = new Set();
   
   jsonData.forEach((item, index) => {
     const rowNum = index + 1;
@@ -35,6 +39,19 @@ export function validateSBABulkUpload(jsonData) {
       rowErrors.push('sba_name is required');
     } else if (typeof item.sba_name !== 'string') {
       rowErrors.push('sba_name must be a string');
+    }
+    
+    // Check for duplicates: date + sba_name
+    if (item.date && item.sba_name) {
+      const key = `${item.date}|${item.sba_name}`;
+      if (seen.has(key)) {
+        rowErrors.push(`duplicate: same date+name found at row ${seen.get(key)}`);
+        duplicateIndexes.add(index);
+        duplicateIndexes.add(seen.get(key) - 1); // Mark the first occurrence too
+        results.summary.duplicates++;
+      } else {
+        seen.set(key, rowNum);
+      }
     }
     
     // Validate optional fields
@@ -59,7 +76,8 @@ export function validateSBABulkUpload(jsonData) {
       rowNum,
       data: item,
       valid: isValid,
-      errors: rowErrors
+      errors: rowErrors,
+      isDuplicate: duplicateIndexes.has(index)
     });
   });
   
@@ -72,7 +90,7 @@ export function validateTelegramBulkUpload(jsonData) {
     valid: true,
     errors: [],
     preview: [],
-    summary: { total: 0, valid: 0, errors: 0 }
+    summary: { total: 0, valid: 0, errors: 0, duplicates: 0 }
   };
   
   if (!Array.isArray(jsonData)) {
@@ -82,6 +100,10 @@ export function validateTelegramBulkUpload(jsonData) {
   }
   
   results.summary.total = jsonData.length;
+  
+  // Track duplicates: key is "date|source|question_text"
+  const seen = new Map();
+  const duplicateIndexes = new Set();
   
   jsonData.forEach((item, index) => {
     const rowNum = index + 1;
@@ -98,6 +120,20 @@ export function validateTelegramBulkUpload(jsonData) {
       rowErrors.push('question_text is required');
     } else if (typeof item.question_text !== 'string') {
       rowErrors.push('question_text must be a string');
+    }
+    
+    // Check for duplicates: date + source + question_text
+    if (item.date && item.question_text) {
+      const source = item.source || '';
+      const key = `${item.date}|${source}|${item.question_text}`;
+      if (seen.has(key)) {
+        rowErrors.push(`duplicate: same date+source+text found at row ${seen.get(key)}`);
+        duplicateIndexes.add(index);
+        duplicateIndexes.add(seen.get(key) - 1); // Mark the first occurrence too
+        results.summary.duplicates++;
+      } else {
+        seen.set(key, rowNum);
+      }
     }
     
     // Validate optional fields
@@ -126,7 +162,8 @@ export function validateTelegramBulkUpload(jsonData) {
       rowNum,
       data: item,
       valid: isValid,
-      errors: rowErrors
+      errors: rowErrors,
+      isDuplicate: duplicateIndexes.has(index)
     });
   });
   

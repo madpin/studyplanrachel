@@ -359,45 +359,56 @@ export async function seedSBASchedule(userId, templateSBASchedule) {
     let totalSBA = 0;
     let skipped = 0;
     
-    // Prepare SBA entries, checking for existing ones
+    // Collect all dates to check in one query
+    const allDates = Object.keys(templateSBASchedule);
+    
+    // Batch check for existing SBA entries for all dates
+    const { data: existingEntries, error: checkError } = await supabase
+      .from('sba_schedule')
+      .select('date, sba_name')
+      .eq('user_id', userId)
+      .in('date', allDates);
+    
+    if (checkError) {
+      console.error('Error checking existing SBA entries:', checkError);
+      throw checkError;
+    }
+    
+    // Create a Set of existing entries for quick lookup: "date|sba_name"
+    const existingSet = new Set(
+      (existingEntries || []).map(entry => `${entry.date}|${entry.sba_name}`)
+    );
+    
+    // Prepare SBA entries to insert
+    const entriesToInsert = [];
     for (const [date, tests] of Object.entries(templateSBASchedule)) {
       for (const testName of tests) {
-        // Check if this specific SBA entry already exists - PRESERVE EXISTING
-        const { data: existing, error: checkError } = await supabase
-          .from('sba_schedule')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('date', date)
-          .eq('sba_name', testName)
-          .limit(1);
-        
-        if (checkError) {
-          console.error(`Error checking existing SBA for ${date}:`, checkError);
-          continue;
-        }
-        
-        if (existing && existing.length > 0) {
+        const key = `${date}|${testName}`;
+        if (existingSet.has(key)) {
           skipped++;
           continue; // Skip if already exists
         }
         
-        // Insert new SBA entry
-        const { error: insertError } = await supabase
-          .from('sba_schedule')
-          .insert({
-            user_id: userId,
-            date: date,
-            sba_name: testName,
-            completed: false,
-            is_placeholder: false
-          });
-        
-        if (insertError) {
-          console.error(`Error inserting SBA for ${date}:`, insertError);
-          continue;
-        }
-        
+        entriesToInsert.push({
+          user_id: userId,
+          date: date,
+          sba_name: testName,
+          completed: false,
+          is_placeholder: false
+        });
         totalSBA++;
+      }
+    }
+    
+    // Batch insert all new SBA entries
+    if (entriesToInsert.length > 0) {
+      const { error: insertError } = await supabase
+        .from('sba_schedule')
+        .insert(entriesToInsert);
+      
+      if (insertError) {
+        console.error('Error batch inserting SBA entries:', insertError);
+        throw insertError;
       }
     }
     
@@ -415,6 +426,35 @@ export async function seedTelegramQuestions(userId, templateDetailedSchedule) {
     let totalQuestions = 0;
     let skipped = 0;
     
+    // Collect all dates that have Telegram questions
+    const datesToProcess = [];
+    for (const [date, dayData] of Object.entries(templateDetailedSchedule)) {
+      const resources = dayData.resources || [];
+      if (resources.includes('Telegram Q') || resources.includes('Optional Telegram Q')) {
+        datesToProcess.push(date);
+      }
+    }
+    
+    // Batch check for existing Telegram questions for all dates
+    const { data: existingQuestions, error: checkError } = await supabase
+      .from('telegram_questions')
+      .select('date')
+      .eq('user_id', userId)
+      .in('date', datesToProcess);
+    
+    if (checkError) {
+      console.error('Error checking existing Telegram questions:', checkError);
+      throw checkError;
+    }
+    
+    // Create a Set of dates that already have questions
+    const existingDates = new Set(
+      (existingQuestions || []).map(q => q.date)
+    );
+    
+    // Prepare entries to insert
+    const entriesToInsert = [];
+    
     for (const [date, dayData] of Object.entries(templateDetailedSchedule)) {
       const resources = dayData.resources || [];
       const dayType = dayData.type;
@@ -426,31 +466,16 @@ export async function seedTelegramQuestions(userId, templateDetailedSchedule) {
         continue;
       }
       
-      // Check if Telegram questions already exist for this date - PRESERVE EXISTING
-      const { data: existing, error: checkError } = await supabase
-        .from('telegram_questions')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('date', date)
-        .limit(1);
-      
-      if (checkError) {
-        console.error(`Error checking existing Telegram for ${date}:`, checkError);
+      // Skip if already exists for this date
+      if (existingDates.has(date)) {
+        skipped++;
         continue;
       }
       
-      if (existing && existing.length > 0) {
-        skipped++;
-        continue; // Skip if already exists for this date
-      }
-      
-      // Prepare entries for this date
-      const telegramEntries = [];
-      
-      // Determine number of question sets and source based on day type
+      // Determine entries based on day type
       if (isBrazil && resources.length > 0) {
         // Optional light questions during trip
-        telegramEntries.push({
+        entriesToInsert.push({
           user_id: userId,
           date: date,
           question_text: 'Optional Telegram Q (10-20 questions)',
@@ -458,9 +483,10 @@ export async function seedTelegramQuestions(userId, templateDetailedSchedule) {
           completed: false,
           is_placeholder: true
         });
+        totalQuestions++;
       } else if (isRest) {
         // Rest or exam-eve - optional questions
-        telegramEntries.push({
+        entriesToInsert.push({
           user_id: userId,
           date: date,
           question_text: 'MRCOG Study Group Questions (5-10 questions)',
@@ -468,7 +494,7 @@ export async function seedTelegramQuestions(userId, templateDetailedSchedule) {
           completed: false,
           is_placeholder: true
         });
-        telegramEntries.push({
+        entriesToInsert.push({
           user_id: userId,
           date: date,
           question_text: 'MRCOG Intensive Hour Study Group Questions (5-10 questions)',
@@ -476,9 +502,10 @@ export async function seedTelegramQuestions(userId, templateDetailedSchedule) {
           completed: false,
           is_placeholder: true
         });
+        totalQuestions += 2;
       } else {
         // Regular study days (work, off, intensive, revision)
-        telegramEntries.push({
+        entriesToInsert.push({
           user_id: userId,
           date: date,
           question_text: 'MRCOG Study Group Questions (~10 questions)',
@@ -486,7 +513,7 @@ export async function seedTelegramQuestions(userId, templateDetailedSchedule) {
           completed: false,
           is_placeholder: true
         });
-        telegramEntries.push({
+        entriesToInsert.push({
           user_id: userId,
           date: date,
           question_text: 'MRCOG Intensive Hour Study Group Questions (~10 questions)',
@@ -494,24 +521,23 @@ export async function seedTelegramQuestions(userId, templateDetailedSchedule) {
           completed: false,
           is_placeholder: true
         });
-      }
-      
-      // Insert entries for this date
-      if (telegramEntries.length > 0) {
-        const { error: insertError } = await supabase
-          .from('telegram_questions')
-          .insert(telegramEntries);
-        
-        if (insertError) {
-          console.error(`Error inserting Telegram questions for ${date}:`, insertError);
-          continue;
-        }
-        
-        totalQuestions += telegramEntries.length;
+        totalQuestions += 2;
       }
     }
     
-    console.log(`Seeded ${totalQuestions} Telegram question entries (skipped ${skipped} existing dates)`);
+    // Batch insert all new Telegram entries
+    if (entriesToInsert.length > 0) {
+      const { error: insertError } = await supabase
+        .from('telegram_questions')
+        .insert(entriesToInsert);
+      
+      if (insertError) {
+        console.error('Error batch inserting Telegram questions:', insertError);
+        throw insertError;
+      }
+    }
+    
+    console.log(`Seeded ${totalQuestions} Telegram question placeholders (skipped ${skipped} existing dates)`);
     return totalQuestions;
   } catch (error) {
     console.error('Error seeding Telegram questions:', error);
@@ -848,6 +874,8 @@ export async function saveDailyNote(userId, date, notes) {
       user_id: userId,
       date: dateStr,
       notes: notes
+    }, {
+      onConflict: 'user_id,date'
     });
 
   if (error) throw error;
@@ -1246,13 +1274,26 @@ export async function bulkUploadTelegramQuestions(userId, jsonData) {
 // Onboarding
 // ============================================
 
-export async function completeOnboarding(userId, examDate, tripStart, tripEnd, selectedModules, useTemplate = false) {
+export async function completeOnboarding(userId, examDate, tripStart, tripEnd, selectedModules, useTemplate = false, maxStudyMinutes = 480, workDaysPattern = null) {
   try {
     // Use template dates if using template
     if (useTemplate) {
       examDate = '2026-01-14';
       tripStart = '2025-12-19';
       tripEnd = '2025-12-29';
+    }
+
+    // Default work days pattern if not provided
+    if (!workDaysPattern) {
+      workDaysPattern = {
+        monday: true,
+        tuesday: true,
+        wednesday: true,
+        thursday: true,
+        friday: true,
+        saturday: false,
+        sunday: false
+      };
     }
 
     // 1. Create or update user_settings (upsert to handle re-runs)
@@ -1262,7 +1303,9 @@ export async function completeOnboarding(userId, examDate, tripStart, tripEnd, s
         user_id: userId,
         exam_date: examDate,
         brazil_trip_start: tripStart,
-        brazil_trip_end: tripEnd
+        brazil_trip_end: tripEnd,
+        max_study_minutes: maxStudyMinutes,
+        work_days_pattern: workDaysPattern
       }, {
         onConflict: 'user_id'
       });

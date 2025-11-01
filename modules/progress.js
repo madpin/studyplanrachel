@@ -6,6 +6,7 @@
 import { appState, getTasksForDate } from './state.js';
 import { formatDateISO } from './schedule.js';
 import { loadSBATests, loadTelegramQuestions } from './storage.js';
+import { supabase } from '../config.js';
 
 // ============================================
 // Overall Progress
@@ -110,12 +111,46 @@ export function calculateSBAProgress() {
  */
 export async function updateSBAHeaderStats(userId) {
   try {
-    const tests = await loadSBATests(userId);
-    const totalCompleted = tests.reduce((sum, test) => sum + test.completed, 0);
-    const totalDays = tests.reduce((sum, test) => sum + test.total_days, 0);
-    const percentage = totalDays > 0 ? Math.round((totalCompleted / totalDays) * 100) : 0;
+    // Check cache first (5 minute cache)
+    const cacheKey = 'sba';
+    const now = Date.now();
+    const cacheTimeout = 5 * 60 * 1000; // 5 minutes
     
-    return { completed: totalCompleted, total: totalDays, percentage };
+    if (appState.statsCache[cacheKey].data && 
+        appState.statsCache[cacheKey].timestamp && 
+        (now - appState.statsCache[cacheKey].timestamp) < cacheTimeout) {
+      return appState.statsCache[cacheKey].data;
+    }
+    
+    // Use count query instead of loading all rows
+    const { count: totalCount, error: totalError } = await supabase
+      .from('sba_schedule')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+    
+    if (totalError) throw totalError;
+    
+    const { count: completedCount, error: completedError } = await supabase
+      .from('sba_schedule')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('completed', true);
+    
+    if (completedError) throw completedError;
+    
+    const total = totalCount || 0;
+    const completed = completedCount || 0;
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+    
+    const stats = { completed, total, percentage };
+    
+    // Cache the result
+    appState.statsCache[cacheKey] = {
+      data: stats,
+      timestamp: now
+    };
+    
+    return stats;
   } catch (error) {
     console.error('Error updating SBA header stats:', error);
     return { completed: 0, total: 0, percentage: 0 };
@@ -151,12 +186,56 @@ export function calculateTelegramProgress() {
  */
 export async function updateTelegramHeaderStats(userId) {
   try {
-    const startDate = new Date('2025-01-01');
-    const endDate = new Date('2026-12-31');
-    const questions = await loadTelegramQuestions(userId, startDate, endDate);
-    const completed = questions.filter(q => q.completed && !q.is_placeholder).length;
+    // Check cache first (5 minute cache)
+    const cacheKey = 'telegram';
+    const now = Date.now();
+    const cacheTimeout = 5 * 60 * 1000; // 5 minutes
     
-    return completed;
+    if (appState.statsCache[cacheKey].data !== null && 
+        appState.statsCache[cacheKey].timestamp && 
+        (now - appState.statsCache[cacheKey].timestamp) < cacheTimeout) {
+      return appState.statsCache[cacheKey].data;
+    }
+    
+    // Try to get user settings to scope by dates
+    const { data: settings, error: settingsError } = await supabase
+      .from('user_settings')
+      .select('exam_date')
+      .eq('user_id', userId)
+      .single();
+    
+    let query = supabase
+      .from('telegram_questions')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('completed', true)
+      .eq('is_placeholder', false);
+    
+    // If user has settings, scope by study period
+    if (!settingsError && settings && settings.exam_date) {
+      // Use a reasonable study start date (1 year before exam or current date - 1 year)
+      const examDate = new Date(settings.exam_date);
+      const studyStartDate = new Date(examDate);
+      studyStartDate.setFullYear(studyStartDate.getFullYear() - 1);
+      
+      query = query
+        .gte('date', studyStartDate.toISOString().split('T')[0])
+        .lte('date', settings.exam_date);
+    }
+    
+    const { count, error } = await query;
+    
+    if (error) throw error;
+    
+    const result = count || 0;
+    
+    // Cache the result
+    appState.statsCache[cacheKey] = {
+      data: result,
+      timestamp: now
+    };
+    
+    return result;
   } catch (error) {
     console.error('Error updating Telegram header stats:', error);
     return 0;

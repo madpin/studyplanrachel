@@ -161,11 +161,14 @@
                     </div>
                 </div>
 
-                <!-- Daily View -->
                 <section id="dailyView" class="view-section active" style="display: none;">
                     <div class="view-header">
                         <h2>Today's Study Plan</h2>
                         <div class="daily-view-actions">
+                            <label class="filter-toggle">
+                                <input type="checkbox" id="workSuitableFilter">
+                                <span>Work-suitable only</span>
+                            </label>
                             <button onclick="showAddTaskModal()" class="btn btn--sm btn--primary">+ Add Task</button>
                             <div class="date-navigator">
                                 <button onclick="changeDay(-1)" class="nav-btn">← Previous</button>
@@ -210,9 +213,17 @@
                     <div class="notes-section">
                         <div class="notes-header">
                             <h3>Daily Notes</h3>
-                            <button id="saveNotesBtn" class="btn btn--sm btn--primary">💾 Save Notes</button>
+                            <div class="notes-controls">
+                                <span class="notes-char-counter" id="notesCharCounter">0 chars</span>
+                                <button id="saveNotesBtn" class="btn btn--sm btn--primary">💾 Save Notes</button>
+                            </div>
                         </div>
-                        <textarea id="dailyNotes" placeholder="Add any notes about today's study session..."></textarea>
+                        <div class="notes-quick-tags">
+                            <button class="notes-tag-btn" onclick="window.addNoteTag('#review')">🔄 #review</button>
+                            <button class="notes-tag-btn" onclick="window.addNoteTag('#stuck')">❓ #stuck</button>
+                            <button class="notes-tag-btn" onclick="window.addNoteTag('#important')">⭐ #important</button>
+                        </div>
+                        <textarea id="dailyNotes" placeholder="Add any notes about today's study session... Use #tags for later filtering"></textarea>
                         <div id="notesSaveStatus" class="notes-save-status"></div>
                     </div>
                 </section>
@@ -343,13 +354,32 @@
                 </section>
             </main>
         </div>
+        
+        <!-- Floating Action Button for Mobile -->
+        <div class="fab-container" id="fabContainer">
+            <button class="fab fab-main" id="fabMain" aria-label="Quick actions">+</button>
+            <div class="fab-menu" id="fabMenu" style="display: none;">
+                <button class="fab fab-option" onclick="window.showAddTaskModal()" aria-label="Add task">
+                    <span class="fab-label">Task</span>
+                    <span class="fab-icon">📝</span>
+                </button>
+                <button class="fab fab-option" onclick="window.showAddSBAScheduleEntry()" aria-label="Add SBA">
+                    <span class="fab-label">SBA</span>
+                    <span class="fab-icon">📋</span>
+                </button>
+                <button class="fab fab-option" onclick="window.showAddTelegramModal()" aria-label="Add Telegram Q">
+                    <span class="fab-label">Telegram</span>
+                    <span class="fab-icon">💬</span>
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Onboarding Modal (First Time User) -->
-    <div id="onboardingModal" class="modal" style="display: none;">
+    <div id="onboardingModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="onboardingModalTitle">
         <div class="modal-content modal-large">
             <div class="modal-header">
-                <h3>Welcome! Let's Set Up Your Study Plan</h3>
+                <h3 id="onboardingModalTitle">Welcome! Let's Set Up Your Study Plan</h3>
             </div>
             <form id="onboardingForm" class="modal-body">
                 <div class="onboarding-section">
@@ -405,6 +435,64 @@
                     </div>
                 </div>
 
+                <div class="onboarding-section">
+                    <h4>⚙️ Daily Capacity Configuration</h4>
+                    <p class="section-description">Set your daily study limits to help with capacity planning.</p>
+                    <div class="form-group">
+                        <label class="form-label">Maximum Study Time Per Day</label>
+                        <div class="capacity-input-group">
+                            <input type="number" id="onboardingMaxStudyHours" class="form-control" value="8" min="1" max="16" step="0.5">
+                            <span class="input-suffix">hours</span>
+                        </div>
+                        <small class="form-help">How many hours can you realistically study per day?</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Work Days Pattern</label>
+                        <div class="work-days-selector">
+                            <label class="day-checkbox-label">
+                                <input type="checkbox" name="workDay" value="monday" checked>
+                                <span>Mon</span>
+                            </label>
+                            <label class="day-checkbox-label">
+                                <input type="checkbox" name="workDay" value="tuesday" checked>
+                                <span>Tue</span>
+                            </label>
+                            <label class="day-checkbox-label">
+                                <input type="checkbox" name="workDay" value="wednesday" checked>
+                                <span>Wed</span>
+                            </label>
+                            <label class="day-checkbox-label">
+                                <input type="checkbox" name="workDay" value="thursday" checked>
+                                <span>Thu</span>
+                            </label>
+                            <label class="day-checkbox-label">
+                                <input type="checkbox" name="workDay" value="friday" checked>
+                                <span>Fri</span>
+                            </label>
+                            <label class="day-checkbox-label">
+                                <input type="checkbox" name="workDay" value="saturday">
+                                <span>Sat</span>
+                            </label>
+                            <label class="day-checkbox-label">
+                                <input type="checkbox" name="workDay" value="sunday">
+                                <span>Sun</span>
+                            </label>
+                        </div>
+                        <small class="form-help">Select which days you'll be working (limited study time available)</small>
+                    </div>
+                </div>
+
+                <div class="onboarding-section" id="templatePreviewSection" style="display: none;">
+                    <h4>📊 Template Preview</h4>
+                    <p class="section-description">Here's what the first week of your study plan will look like:</p>
+                    <button type="button" onclick="generateTemplatePreview()" class="btn btn--sm btn--outline" id="previewBtn">
+                        👁️ Show Preview
+                    </button>
+                    <div id="templatePreviewContent" class="template-preview-content" style="display: none;">
+                        <!-- Preview will be populated here -->
+                    </div>
+                </div>
+
                 <div class="modal-actions">
                     <button type="button" onclick="submitOnboarding(true)" class="btn btn--primary btn--large" id="useTemplateBtn">
                         📋 Use Template (Recommended)
@@ -418,11 +506,11 @@
     </div>
 
     <!-- Settings Modal -->
-    <div id="settingsModal" class="modal" style="display: none;">
+    <div id="settingsModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Settings</h3>
-                <button onclick="closeSettingsModal()" class="modal-close">&times;</button>
+                <h3 id="settingsModalTitle">Settings</h3>
+                <button onclick="closeSettingsModal()" class="modal-close" aria-label="Close settings">&times;</button>
             </div>
             <form id="settingsForm" class="modal-body">
                 <div class="form-group">
@@ -446,11 +534,11 @@
     </div>
 
     <!-- Add SBA Test Modal -->
-    <div id="addSBAModal" class="modal" style="display: none;">
+    <div id="addSBAModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="sbaModalTitle">
         <div class="modal-content">
             <div class="modal-header">
                 <h3 id="sbaModalTitle">Add SBA Test</h3>
-                <button onclick="closeSBAModal()" class="modal-close">&times;</button>
+                <button onclick="closeSBAModal()" class="modal-close" aria-label="Close SBA modal">&times;</button>
             </div>
             <form id="sbaForm" class="modal-body">
                 <input type="hidden" id="sbaEditId">
@@ -483,11 +571,11 @@
     </div>
 
     <!-- Add Telegram Question Modal -->
-    <div id="addTelegramModal" class="modal" style="display: none;">
+    <div id="addTelegramModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="telegramModalTitle">
         <div class="modal-content">
             <div class="modal-header">
                 <h3 id="telegramModalTitle">Add Telegram Question</h3>
-                <button onclick="closeTelegramModal()" class="modal-close">&times;</button>
+                <button onclick="closeTelegramModal()" class="modal-close" aria-label="Close telegram modal">&times;</button>
             </div>
             <form id="telegramForm" class="modal-body">
                 <input type="hidden" id="telegramEditId">
@@ -516,11 +604,11 @@
     </div>
 
     <!-- Add Task Modal -->
-    <div id="addTaskModal" class="modal" style="display: none;">
+    <div id="addTaskModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="taskModalTitle">
         <div class="modal-content">
             <div class="modal-header">
                 <h3 id="taskModalTitle">Add Task</h3>
-                <button onclick="closeTaskModal()" class="modal-close">&times;</button>
+                <button onclick="closeTaskModal()" class="modal-close" aria-label="Close task modal">&times;</button>
             </div>
             <form id="taskForm" class="modal-body">
                 <input type="hidden" id="taskEditId">
@@ -573,11 +661,11 @@
     </div>
 
     <!-- Bulk Upload Modal -->
-    <div id="bulkUploadModal" class="modal" style="display: none;">
+    <div id="bulkUploadModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="bulkUploadTitle">
         <div class="modal-content">
             <div class="modal-header">
                 <h3 id="bulkUploadTitle">Bulk Upload</h3>
-                <button onclick="closeBulkUploadModal()" class="modal-close">&times;</button>
+                <button onclick="closeBulkUploadModal()" class="modal-close" aria-label="Close bulk upload modal">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
@@ -588,16 +676,41 @@
                     </select>
                 </div>
                 <div class="form-group">
+                    <label class="form-label">Input Format</label>
+                    <div class="format-toggle">
+                        <label class="radio-label">
+                            <input type="radio" name="uploadFormat" value="json" checked onchange="toggleUploadFormat()">
+                            <span>JSON</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="uploadFormat" value="csv" onchange="toggleUploadFormat()">
+                            <span>CSV</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="form-group" id="jsonUploadSection">
                     <label class="form-label">JSON Data</label>
                     <textarea id="bulkUploadJSON" class="form-control" rows="10" placeholder='[{"date":"2025-11-01","sba_name":"Test 1"}]'></textarea>
                     <small class="form-help">Paste your JSON data here. See format guide below.</small>
                 </div>
-                <div class="json-format-guide">
+                <div class="form-group" id="csvUploadSection" style="display: none;">
+                    <label class="form-label">CSV Data</label>
+                    <textarea id="bulkUploadCSV" class="form-control" rows="10" placeholder="date,sba_name,is_placeholder&#10;2025-11-01,Test 1,false"></textarea>
+                    <small class="form-help">Paste your CSV data with headers. First row must contain column names.</small>
+                </div>
+                <div class="json-format-guide" id="jsonFormatGuide">
                     <strong>Format Guide:</strong>
                     <p>For SBA:</p>
                     <code>[{"date":"2025-11-01","sba_name":"Biostatistics SBA Day 1","is_placeholder":false}]</code>
                     <p>For Telegram:</p>
                     <code>[{"date":"2025-11-01","question_text":"Sample question","source":"MRCOG Study Group"}]</code>
+                </div>
+                <div class="csv-format-guide" id="csvFormatGuide" style="display: none;">
+                    <strong>CSV Format Guide:</strong>
+                    <p>For SBA (columns: date, sba_name, is_placeholder):</p>
+                    <code>date,sba_name,is_placeholder<br>2025-11-01,Biostatistics SBA Day 1,false<br>2025-11-02,Embryology SBA Day 1,false</code>
+                    <p>For Telegram (columns: date, question_text, source, completed, is_placeholder):</p>
+                    <code>date,question_text,source,completed,is_placeholder<br>2025-11-01,Sample question,MRCOG Study Group,false,true</code>
                 </div>
                 <div id="bulkUploadResult" class="upload-result"></div>
                 <div class="modal-actions">
@@ -609,11 +722,11 @@
     </div>
 
     <!-- Placeholder Creation Modal -->
-    <div id="placeholderModal" class="modal" style="display: none;">
+    <div id="placeholderModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="placeholderModalTitle">
         <div class="modal-content modal-large">
             <div class="modal-header">
                 <h3 id="placeholderModalTitle">Create Placeholders</h3>
-                <button onclick="closePlaceholderModal()" class="modal-close">&times;</button>
+                <button onclick="closePlaceholderModal()" class="modal-close" aria-label="Close placeholder modal">&times;</button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="placeholderType">
@@ -648,3 +761,5 @@
     <script type="module" src="app.js"></script>
 </body>
 </html>
+<!-- Sortable.js for drag-and-drop -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>

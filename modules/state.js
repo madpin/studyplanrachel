@@ -16,6 +16,14 @@ export const appState = {
   viewingDate: new Date(),
   viewingWeekStart: null,
   viewingMonth: new Date(),
+  statsCache: {
+    sba: { data: null, timestamp: null },
+    telegram: { data: null, timestamp: null },
+    overall: { data: null, timestamp: null }
+  },
+  selectedTasks: new Set(), // For multi-select
+  lastSelectedTaskIndex: null, // For shift-click range selection
+  multiSelectMode: false,
   motivationalMessages: [
     "One day at a time - you're doing great!",
     "Small steps lead to big wins!",
@@ -189,5 +197,42 @@ export function setViewingMonth(date) {
 export function getRandomMotivationalMessage() {
   const messages = appState.motivationalMessages;
   return messages[Math.floor(Math.random() * messages.length)];
+}
+
+// Multi-select state management
+export function getSelectedTasks() {
+  return appState.selectedTasks;
+}
+
+export function toggleTaskSelection(taskId) {
+  if (appState.selectedTasks.has(taskId)) {
+    appState.selectedTasks.delete(taskId);
+  } else {
+    appState.selectedTasks.add(taskId);
+  }
+}
+
+export function clearSelectedTasks() {
+  appState.selectedTasks.clear();
+  appState.lastSelectedTaskIndex = null;
+}
+
+export function setLastSelectedTaskIndex(index) {
+  appState.lastSelectedTaskIndex = index;
+}
+
+export function getLastSelectedTaskIndex() {
+  return appState.lastSelectedTaskIndex;
+}
+
+export function setMultiSelectMode(enabled) {
+  appState.multiSelectMode = enabled;
+  if (!enabled) {
+    clearSelectedTasks();
+  }
+}
+
+export function isMultiSelectMode() {
+  return appState.multiSelectMode;
 }
 
