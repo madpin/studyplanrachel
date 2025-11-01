@@ -647,8 +647,9 @@ export async function loadAllTasksToToday(userId) {
       .eq('user_id', userId)
       .gte('date', startStr)
       .lte('date', todayStr)
-      .order('date')
-      .order('sort_order');
+      .order('date', { ascending: true })
+      .order('sort_order', { ascending: true })
+      .order('sort_order', { foreignTable: 'tasks', ascending: true });
 
     if (error) throw error;
     
@@ -676,7 +677,8 @@ export async function loadTasksForDate(userId, date) {
     .select('*, tasks(*)')
     .eq('user_id', userId)
     .eq('date', dateStr)
-    .order('sort_order');
+    .order('sort_order', { ascending: true })
+    .order('sort_order', { foreignTable: 'tasks', ascending: true });
 
   if (error) throw error;
   return categories || [];
@@ -693,8 +695,9 @@ export async function loadTasksForDateRange(userId, startDate, endDate) {
     .eq('user_id', userId)
     .gte('date', startStr)
     .lte('date', endStr)
-    .order('date')
-    .order('sort_order');
+    .order('date', { ascending: true })
+    .order('sort_order', { ascending: true })
+    .order('sort_order', { foreignTable: 'tasks', ascending: true });
 
   if (error) throw error;
   

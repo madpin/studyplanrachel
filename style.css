@@ -1581,12 +1581,21 @@ body {
   flex: 1;
 }
 
+.task-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-12);
+  margin-bottom: var(--space-8);
+  position: relative;
+}
+
 .task-name {
   font-weight: var(--font-weight-semibold);
   color: var(--color-text);
-  margin-bottom: var(--space-8);
   font-size: var(--font-size-base);
   line-height: 1.4;
+  flex: 1;
 }
 
 .task-item.completed .task-name {
@@ -1601,6 +1610,110 @@ body {
   color: var(--color-text-secondary);
   flex-wrap: wrap;
   align-items: center;
+}
+
+/* Task menu button (3 dots) */
+.task-menu-btn {
+  background: transparent;
+  border: none;
+  padding: var(--space-4);
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-base);
+  transition: all var(--duration-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.task-menu-btn:hover {
+  background: rgba(var(--color-primary-rgb), 0.1);
+  color: var(--color-primary);
+}
+
+.task-menu-btn:active {
+  transform: scale(0.95);
+}
+
+/* Task menu dropdown */
+.task-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid rgba(var(--color-primary-rgb), 0.15);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 100;
+  min-width: 160px;
+  overflow: hidden;
+  animation: slideDown 0.15s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.task-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  width: 100%;
+  padding: var(--space-12) var(--space-16);
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+  text-align: left;
+}
+
+.task-menu-item:hover {
+  background: rgba(var(--color-primary-rgb), 0.08);
+}
+
+.task-menu-item:active {
+  background: rgba(var(--color-primary-rgb), 0.12);
+}
+
+.task-menu-item.delete {
+  color: var(--color-danger);
+}
+
+.task-menu-item.delete:hover {
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.task-menu-item .menu-icon {
+  font-size: var(--font-size-base);
+  width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.task-menu-item .menu-text {
+  flex: 1;
+}
+
+/* Time badge styling */
+.time-badge {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
 }
 
 .task-badge {
@@ -2346,6 +2459,61 @@ body {
   
   .task-item {
     padding: var(--space-16);
+  }
+  
+  /* Mobile-specific improvements for task menu */
+  .task-menu-btn {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .task-menu {
+    min-width: 180px;
+    box-shadow: var(--shadow-xl);
+  }
+  
+  .task-menu-item {
+    padding: var(--space-14) var(--space-18);
+    font-size: var(--font-size-base);
+    min-height: 48px;
+  }
+  
+  .task-menu-item .menu-icon {
+    font-size: var(--font-size-lg);
+    width: 24px;
+  }
+  
+  /* Better spacing for mobile task cards */
+  .task-list {
+    gap: var(--space-14);
+  }
+  
+  .task-item {
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sm);
+  }
+  
+  .task-header {
+    gap: var(--space-8);
+  }
+  
+  .task-name {
+    font-size: var(--font-size-base);
+    line-height: 1.5;
+  }
+  
+  .task-meta {
+    gap: var(--space-10);
+  }
+  
+  .task-badge {
+    font-size: var(--font-size-xs);
+    padding: var(--space-4) var(--space-12);
+  }
+  
+  /* Add padding bottom to daily content to prevent FAB overlap */
+  .daily-content {
+    padding-bottom: 120px;
   }
   
   .calendar-day:hover {
@@ -4571,10 +4739,40 @@ input[type="checkbox"]:checked {
 
 .sortable-chosen {
   cursor: grabbing !important;
+  /* Add visual feedback for touch devices */
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
 }
 
 .sortable-drag {
   opacity: 0;
+}
+
+/* Improve touch targets for mobile devices */
+@media (max-width: 768px) {
+  .task-category-header {
+    /* Add visual indicator that it's draggable */
+    cursor: grab;
+    /* Increase touch target size */
+    padding: 16px;
+    touch-action: pan-y; /* Allow vertical scrolling, enable horizontal drag */
+  }
+  
+  .task-item {
+    /* Increase touch target size for better mobile UX */
+    padding: 14px 12px;
+    touch-action: pan-y; /* Allow vertical scrolling */
+  }
+  
+  /* Add a subtle drag handle indicator on mobile */
+  .task-category-header::before {
+    content: "⋮⋮";
+    opacity: 0.3;
+    margin-right: 8px;
+    font-size: 16px;
+    user-select: none;
+  }
 }
 
 .task-category-header {

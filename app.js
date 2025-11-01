@@ -701,6 +701,10 @@ function toggleTemplatePreviewSection() {
   }
 }
 
+// Store Sortable instances to prevent duplicates
+let categoriesSortableInstance = null;
+let tasksSortableInstances = [];
+
 // Initialize drag-and-drop for task categories and tasks
 function initializeDragAndDrop() {
   // Wait for Sortable.js to load
@@ -713,12 +717,19 @@ function initializeDragAndDrop() {
   const dailyContent = document.getElementById('dailyContent');
   if (!dailyContent) return;
   
-  const observer = new MutationObserver(() => {
-    setupCategoriesSortable();
-    setupTasksSortable();
+  const observer = new MutationObserver((mutations) => {
+    // Only reinitialize if there were significant changes to the structure
+    const hasStructuralChanges = mutations.some(mutation => 
+      mutation.addedNodes.length > 0 || mutation.removedNodes.length > 0
+    );
+    
+    if (hasStructuralChanges) {
+      setupCategoriesSortable();
+      setupTasksSortable();
+    }
   });
   
-  observer.observe(dailyContent, { childList: true, subtree: true });
+  observer.observe(dailyContent, { childList: true, subtree: false });
   
   // Initial setup
   setupCategoriesSortable();
@@ -733,13 +744,25 @@ function setupCategoriesSortable() {
   const categories = dailyContent.querySelectorAll('.task-category');
   if (categories.length === 0) return;
   
+  // Destroy existing instance if it exists
+  if (categoriesSortableInstance) {
+    categoriesSortableInstance.destroy();
+  }
+  
   // Make the container sortable
-  new Sortable(dailyContent, {
+  categoriesSortableInstance = new Sortable(dailyContent, {
     handle: '.task-category-header',
     animation: 150,
     ghostClass: 'sortable-ghost',
     chosenClass: 'sortable-chosen',
     dragClass: 'sortable-drag',
+    // Mobile-friendly settings
+    delay: 500, // Add delay to distinguish between scroll and drag
+    delayOnTouchOnly: true, // Only apply delay on touch devices
+    touchStartThreshold: 5, // Pixels of movement before canceling delayed drag
+    forceFallback: false, // Use native HTML5 drag when possible
+    scrollSensitivity: 50, // Distance from edge to trigger auto-scroll
+    scrollSpeed: 10,
     onEnd: async function(evt) {
       // Update sort order in database
       await updateCategorySortOrder(evt.oldIndex, evt.newIndex);
@@ -751,29 +774,54 @@ function setupCategoriesSortable() {
 function setupTasksSortable() {
   const taskLists = document.querySelectorAll('.task-list');
   
+  // Destroy all existing instances
+  tasksSortableInstances.forEach(instance => {
+    if (instance) instance.destroy();
+  });
+  tasksSortableInstances = [];
+  
   taskLists.forEach((taskList, categoryIndex) => {
-    new Sortable(taskList, {
+    const sortableInstance = new Sortable(taskList, {
       animation: 150,
       ghostClass: 'sortable-ghost',
       chosenClass: 'sortable-chosen',
       dragClass: 'sortable-drag',
+      // Mobile-friendly settings
+      delay: 500, // Add delay to distinguish between scroll and drag
+      delayOnTouchOnly: true, // Only apply delay on touch devices
+      touchStartThreshold: 5, // Pixels of movement before canceling delayed drag
+      forceFallback: false, // Use native HTML5 drag when possible
+      scrollSensitivity: 50, // Distance from edge to trigger auto-scroll
+      scrollSpeed: 10,
       onEnd: async function(evt) {
         // Update task sort order in database
         await updateTaskSortOrder(taskList, evt.oldIndex, evt.newIndex);
       }
     });
+    
+    tasksSortableInstances.push(sortableInstance);
   });
 }
 
 // Update category sort order in database
 async function updateCategorySortOrder(oldIndex, newIndex) {
   try {
-    const dateStr = formatDateISO(getViewingDate());
-    const categories = getTasksForDate(dateStr);
+    console.log('[updateCategorySortOrder] Moving from', oldIndex, 'to', newIndex);
+    const dateStr = formatDateISO(appState.viewingDate);
+    const categories = appState.tasks[dateStr];
+    
+    if (!categories || categories.length === 0) {
+      console.error('No categories found for date:', dateStr);
+      return;
+    }
+    
+    console.log('[updateCategorySortOrder] Categories before reorder:', categories.map(c => c.category_name));
     
     // Reorder categories array
     const [movedCategory] = categories.splice(oldIndex, 1);
     categories.splice(newIndex, 0, movedCategory);
+    
+    console.log('[updateCategorySortOrder] Categories after reorder:', categories.map(c => c.category_name));
     
     // Update sort_order for all categories
     const updates = categories.map((category, index) => ({
@@ -781,17 +829,34 @@ async function updateCategorySortOrder(oldIndex, newIndex) {
       sort_order: index
     }));
     
-    // Batch update
-    for (const update of updates) {
-      await supabase
+    console.log('[updateCategorySortOrder] Updating database with:', updates);
+    
+    // Batch update - wait for all to complete
+    const updatePromises = updates.map(update => 
+      supabase
         .from('task_categories')
         .update({ sort_order: update.sort_order })
-        .eq('id', update.id);
+        .eq('id', update.id)
+    );
+    
+    const results = await Promise.all(updatePromises);
+    console.log('[updateCategorySortOrder] Database update results:', results);
+    
+    // Check for errors
+    const errors = results.filter(r => r.error);
+    if (errors.length > 0) {
+      console.error('[updateCategorySortOrder] Database errors:', errors);
+      showError('Failed to update some categories');
     }
     
+    // Update local state
+    setTasks({ ...appState.tasks, [dateStr]: categories });
+    
     // Refresh the view
-    await loadTasksForDateHandler(dateStr);
+    await loadTasksForDateHandler(appState.viewingDate);
     UI.renderDailyView();
+    
+    console.log('[updateCategorySortOrder] Reorder complete');
   } catch (error) {
     console.error('Error updating category sort order:', error);
     showError('Failed to reorder categories');
@@ -801,8 +866,11 @@ async function updateCategorySortOrder(oldIndex, newIndex) {
 // Update task sort order in database
 async function updateTaskSortOrder(taskList, oldIndex, newIndex) {
   try {
+    console.log('[updateTaskSortOrder] Moving task from', oldIndex, 'to', newIndex);
     const taskItems = Array.from(taskList.querySelectorAll('.task-item'));
     const taskIds = taskItems.map(item => item.dataset.taskId);
+    
+    console.log('[updateTaskSortOrder] Task IDs in order:', taskIds);
     
     // Update sort_order for all tasks in this category
     const updates = taskIds.map((taskId, index) => ({
@@ -810,18 +878,32 @@ async function updateTaskSortOrder(taskList, oldIndex, newIndex) {
       sort_order: index
     }));
     
-    // Batch update
-    for (const update of updates) {
-      await supabase
+    console.log('[updateTaskSortOrder] Updating database with:', updates);
+    
+    // Batch update - wait for all to complete
+    const updatePromises = updates.map(update =>
+      supabase
         .from('tasks')
         .update({ sort_order: update.sort_order })
-        .eq('id', update.id);
+        .eq('id', update.id)
+    );
+    
+    const results = await Promise.all(updatePromises);
+    console.log('[updateTaskSortOrder] Database update results:', results);
+    
+    // Check for errors
+    const errors = results.filter(r => r.error);
+    if (errors.length > 0) {
+      console.error('[updateTaskSortOrder] Database errors:', errors);
+      showError('Failed to update some tasks');
     }
     
     // Refresh the view
-    const dateStr = formatDateISO(getViewingDate());
-    await loadTasksForDateHandler(dateStr);
+    const dateStr = formatDateISO(appState.viewingDate);
+    await loadTasksForDateHandler(appState.viewingDate);
     UI.renderDailyView();
+    
+    console.log('[updateTaskSortOrder] Reorder complete');
   } catch (error) {
     console.error('Error updating task sort order:', error);
     showError('Failed to reorder tasks');
@@ -918,6 +1000,8 @@ window.changeDay = UI.changeDay;
 window.changeWeek = UI.changeWeek;
 window.changeMonth = UI.changeMonth;
 window.toggleCategory = UI.toggleCategory;
+window.toggleTaskMenu = UI.toggleTaskMenu;
+window.closeTaskMenu = UI.closeTaskMenu;
 window.toggleTaskCompletionHandler = UI.toggleTaskCompletionHandler;
 window.showSettingsModal = UI.showSettingsModal;
 window.closeSettingsModal = UI.closeSettingsModal;

@@ -529,16 +529,36 @@ export function renderDailyView() {
                   onchange="window.toggleTaskCompletionHandler('${task.id}')"
                 />
                 <div class="task-details">
-                  <div class="task-name">
-                    ${task.task_name}
-                    ${task.is_placeholder ? '<span class="placeholder-badge">Placeholder</span>' : ''}
+                  <div class="task-header">
+                    <div class="task-name">
+                      ${task.task_name}
+                      ${task.is_placeholder ? '<span class="placeholder-badge">Placeholder</span>' : ''}
+                    </div>
+                    <button class="task-menu-btn" onclick="window.toggleTaskMenu(event, '${task.id}')" aria-label="Task options">
+                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="10" cy="4" r="1.5" fill="currentColor"/>
+                        <circle cx="10" cy="10" r="1.5" fill="currentColor"/>
+                        <circle cx="10" cy="16" r="1.5" fill="currentColor"/>
+                      </svg>
+                    </button>
+                    <div class="task-menu" id="task-menu-${task.id}" style="display: none;">
+                      <button class="task-menu-item" onclick="window.showRescheduleTaskModal('${task.id}', '${task.task_name}', '${dateStr}'); window.closeTaskMenu('${task.id}')">
+                        <span class="menu-icon">📅</span>
+                        <span class="menu-text">Reschedule</span>
+                      </button>
+                      <button class="task-menu-item" onclick="window.editTask('${task.id}'); window.closeTaskMenu('${task.id}')">
+                        <span class="menu-icon">✏️</span>
+                        <span class="menu-text">Edit</span>
+                      </button>
+                      <button class="task-menu-item delete" onclick="window.deleteTaskConfirm('${task.id}'); window.closeTaskMenu('${task.id}')">
+                        <span class="menu-icon">🗑️</span>
+                        <span class="menu-text">Delete</span>
+                      </button>
+                    </div>
                   </div>
                   <div class="task-meta">
-                    <span>⏱ ${task.time_estimate}</span>
-                    ${task.work_suitable ? '<span class="task-badge work-suitable">✓ Work Suitable</span>' : ''}
-                    <button class="btn btn--sm btn--accent" onclick="window.showRescheduleTaskModal('${task.id}', '${task.task_name}', '${dateStr}')" title="Reschedule this task">📅 Reschedule</button>
-                    <button class="btn btn--sm btn--secondary" onclick="window.editTask('${task.id}')">Edit</button>
-                    <button class="btn btn--sm btn--outline" onclick="window.deleteTaskConfirm('${task.id}')">Delete</button>
+                    <span class="time-badge">⏱ ${task.time_estimate}</span>
+                    ${task.work_suitable ? '<span class="task-badge work-suitable">💼 Work Suitable</span>' : ''}
                   </div>
                 </div>
               </li>
@@ -572,13 +592,28 @@ export function renderDailyView() {
                   onchange="window.handleSBAScheduleToggle('${sba.id}')"
                 />
                 <div class="task-details">
-                  <div class="task-name">
-                    ${sba.sba_name}
-                    ${sba.is_placeholder ? '<span class="placeholder-badge">Placeholder</span>' : ''}
-                  </div>
-                  <div class="task-meta">
-                    <button class="btn btn--sm btn--secondary" onclick="window.editSBAScheduleEntry('${sba.id}')">Edit</button>
-                    <button class="btn btn--sm btn--outline" onclick="window.deleteSBAScheduleEntryConfirm('${sba.id}')">Delete</button>
+                  <div class="task-header">
+                    <div class="task-name">
+                      ${sba.sba_name}
+                      ${sba.is_placeholder ? '<span class="placeholder-badge">Placeholder</span>' : ''}
+                    </div>
+                    <button class="task-menu-btn" onclick="window.toggleTaskMenu(event, 'sba-${sba.id}')" aria-label="Task options">
+                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="10" cy="4" r="1.5" fill="currentColor"/>
+                        <circle cx="10" cy="10" r="1.5" fill="currentColor"/>
+                        <circle cx="10" cy="16" r="1.5" fill="currentColor"/>
+                      </svg>
+                    </button>
+                    <div class="task-menu" id="task-menu-sba-${sba.id}" style="display: none;">
+                      <button class="task-menu-item" onclick="window.editSBAScheduleEntry('${sba.id}'); window.closeTaskMenu('sba-${sba.id}')">
+                        <span class="menu-icon">✏️</span>
+                        <span class="menu-text">Edit</span>
+                      </button>
+                      <button class="task-menu-item delete" onclick="window.deleteSBAScheduleEntryConfirm('${sba.id}'); window.closeTaskMenu('sba-${sba.id}')">
+                        <span class="menu-icon">🗑️</span>
+                        <span class="menu-text">Delete</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </li>
@@ -612,14 +647,29 @@ export function renderDailyView() {
                   onchange="window.handleTelegramToggle('${q.id}')"
                 />
                 <div class="task-details">
-                  <div class="task-name">
-                    ${q.question_text}
-                    ${q.source ? `<span class="source-badge">${q.source}</span>` : ''}
-                    ${q.is_placeholder ? '<span class="placeholder-badge">Placeholder</span>' : ''}
-                  </div>
-                  <div class="task-meta">
-                    <button class="btn btn--sm btn--secondary" onclick="window.editTelegramQuestionFromDaily('${q.id}')">Edit</button>
-                    <button class="btn btn--sm btn--outline" onclick="window.deleteTelegramQuestionConfirm('${q.id}')">Delete</button>
+                  <div class="task-header">
+                    <div class="task-name">
+                      ${q.question_text}
+                      ${q.source ? `<span class="source-badge">${q.source}</span>` : ''}
+                      ${q.is_placeholder ? '<span class="placeholder-badge">Placeholder</span>' : ''}
+                    </div>
+                    <button class="task-menu-btn" onclick="window.toggleTaskMenu(event, 'telegram-${q.id}')" aria-label="Task options">
+                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="10" cy="4" r="1.5" fill="currentColor"/>
+                        <circle cx="10" cy="10" r="1.5" fill="currentColor"/>
+                        <circle cx="10" cy="16" r="1.5" fill="currentColor"/>
+                      </svg>
+                    </button>
+                    <div class="task-menu" id="task-menu-telegram-${q.id}" style="display: none;">
+                      <button class="task-menu-item" onclick="window.editTelegramQuestionFromDaily('${q.id}'); window.closeTaskMenu('telegram-${q.id}')">
+                        <span class="menu-icon">✏️</span>
+                        <span class="menu-text">Edit</span>
+                      </button>
+                      <button class="task-menu-item delete" onclick="window.deleteTelegramQuestionConfirm('${q.id}'); window.closeTaskMenu('telegram-${q.id}')">
+                        <span class="menu-icon">🗑️</span>
+                        <span class="menu-text">Delete</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </li>
@@ -2905,4 +2955,46 @@ export async function executeAutoReschedule() {
     showError('Failed to execute reschedule plan: ' + error.message);
   }
 }
+
+/**
+ * Toggle task menu dropdown
+ * @param {Event} event - Click event
+ * @param {string} taskId - The task ID
+ */
+export function toggleTaskMenu(event, taskId) {
+  event.stopPropagation();
+  
+  // Close all other open menus
+  document.querySelectorAll('.task-menu').forEach(menu => {
+    if (menu.id !== `task-menu-${taskId}`) {
+      menu.style.display = 'none';
+    }
+  });
+  
+  // Toggle current menu
+  const menu = document.getElementById(`task-menu-${taskId}`);
+  if (menu) {
+    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+  }
+}
+
+/**
+ * Close task menu
+ * @param {string} taskId - The task ID
+ */
+export function closeTaskMenu(taskId) {
+  const menu = document.getElementById(`task-menu-${taskId}`);
+  if (menu) {
+    menu.style.display = 'none';
+  }
+}
+
+// Close menus when clicking outside
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('.task-menu') && !event.target.closest('.task-menu-btn')) {
+    document.querySelectorAll('.task-menu').forEach(menu => {
+      menu.style.display = 'none';
+    });
+  }
+});
 
