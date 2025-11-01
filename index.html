@@ -108,6 +108,10 @@
                                 <span class="theme-preview" style="background: linear-gradient(135deg, #0369a1 0%, #a855f7 100%);"></span>
                                 <span class="theme-name">Sky Lavender</span>
                             </button>
+                            <button class="theme-option" data-theme="dark">
+                                <span class="theme-preview" style="background: linear-gradient(135deg, #1f2937 0%, #374151 100%);"></span>
+                                <span class="theme-name">Dark Mode</span>
+                            </button>
                         </div>
                     </div>
                     <button onclick="showSettingsModal()" class="btn btn--secondary btn--sm">⚙️ Settings</button>
@@ -174,6 +178,22 @@
                     <div class="day-info" id="dayInfo">
                         <span class="day-type-badge" id="dayTypeBadge">Regular Day</span>
                         <span class="work-info" id="workInfo"></span>
+                    </div>
+
+                    <!-- Sticky Day Summary Bar -->
+                    <div class="daily-summary-sticky" id="dailySummaryBar" style="display: none;">
+                        <div class="summary-stat">
+                            <span class="summary-label">Tasks:</span>
+                            <span class="summary-value" id="summaryTasks">0/0</span>
+                        </div>
+                        <div class="summary-stat">
+                            <span class="summary-label">Time Done:</span>
+                            <span class="summary-value" id="summaryTimeDone">0m</span>
+                        </div>
+                        <div class="summary-stat">
+                            <span class="summary-label">Time Remaining:</span>
+                            <span class="summary-value" id="summaryTimeRemaining">0m</span>
+                        </div>
                     </div>
 
                     <div class="daily-content" id="dailyContent">

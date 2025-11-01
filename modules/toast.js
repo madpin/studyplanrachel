@@ -12,6 +12,8 @@ function initToastContainer() {
   toastContainer = document.createElement('div');
   toastContainer.id = 'toastContainer';
   toastContainer.className = 'toast-container';
+  toastContainer.setAttribute('aria-live', 'polite');
+  toastContainer.setAttribute('aria-atomic', 'true');
   document.body.appendChild(toastContainer);
 }
 
@@ -135,5 +137,53 @@ function getToastIcon(type) {
     case 'info': return 'ℹ';
     default: return 'ℹ';
   }
+}
+
+/**
+ * Show a toast with an action button
+ * @param {string} message - The message to display
+ * @param {string} actionLabel - Label for the action button
+ * @param {Function} onAction - Callback when action is clicked
+ * @param {number} duration - Duration in ms (default 7000)
+ */
+export function showToastWithAction(message, actionLabel, onAction, duration = 7000) {
+  initToastContainer();
+  
+  const toast = document.createElement('div');
+  toast.className = 'toast toast--info toast--with-action';
+  
+  const icon = getToastIcon('info');
+  toast.innerHTML = `
+    <span class="toast-icon">${icon}</span>
+    <span class="toast-message">${message}</span>
+    <button class="toast-action-btn">${actionLabel}</button>
+    <button class="toast-close" aria-label="Close notification">×</button>
+  `;
+  
+  toastContainer.appendChild(toast);
+  
+  // Handle action button click
+  const actionBtn = toast.querySelector('.toast-action-btn');
+  actionBtn.addEventListener('click', () => {
+    onAction();
+    toast.remove();
+  });
+  
+  // Handle close button click
+  const closeBtn = toast.querySelector('.toast-close');
+  closeBtn.addEventListener('click', () => {
+    toast.remove();
+  });
+  
+  // Animate in
+  setTimeout(() => toast.classList.add('toast--show'), 10);
+  
+  // Auto remove
+  setTimeout(() => {
+    toast.classList.remove('toast--show');
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+  
+  return toast;
 }
 

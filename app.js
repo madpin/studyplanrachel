@@ -156,8 +156,21 @@ async function initializeApp() {
     UI.updateMotivationalBanner();
     UI.updateCatchUpQueue();
     
-    // Switch to daily view (this will render it and make it visible)
-    await UI.switchView('daily');
+    // Restore last view and date from localStorage
+    const lastView = localStorage.getItem('studyplan-last-view') || 'daily';
+    const lastDate = localStorage.getItem('studyplan-last-date');
+    
+    if (lastDate) {
+      const restoredDate = new Date(lastDate);
+      // Only restore if date is valid
+      if (!isNaN(restoredDate.getTime())) {
+        setViewingDate(restoredDate);
+        await loadTasksForDateHandler(restoredDate);
+      }
+    }
+    
+    // Switch to last active view (this will render it and make it visible)
+    await UI.switchView(lastView);
     
     console.log('Step 6: Loading daily note...');
     await loadDailyNoteHandler();
@@ -650,6 +663,10 @@ window.showAddTaskModal = UI.showAddTaskModal;
 window.closeTaskModal = UI.closeTaskModal;
 window.editTask = UI.editTask;
 window.deleteTaskConfirm = UI.deleteTaskConfirm;
+window.showRescheduleTaskModal = UI.showRescheduleTaskModal;
+window.confirmRescheduleTask = UI.confirmRescheduleTask;
+window.showAutoRescheduleModal = UI.showAutoRescheduleModal;
+window.executeAutoReschedule = UI.executeAutoReschedule;
 
 // Expose onboarding functions
 window.closeOnboardingModal = closeOnboardingModal;
@@ -694,6 +711,11 @@ window.debugData = async function(dateStr) {
     console.error('Error checking data:', error);
   }
 };
+
+// Helper to load tasks for a date
+async function loadTasksForDateHandler(date) {
+  return await UI.loadTasksForDateHandler(date);
+}
 
 // Placeholder functions for features not yet fully implemented in modular version
 window.showAddSBAModal = () => UI.showAddSBAModal();

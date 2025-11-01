@@ -20,6 +20,7 @@ import {
   getSBAForDate,
   getTelegramQuestionsForDate,
   getCatchUpQueue,
+  setCatchUpQueue,
   getScheduleForDate,
   setScheduleForDate
 } from './state.js';
@@ -65,7 +66,13 @@ import {
   createTask,
   updateTask,
   deleteTask,
-  createTaskCategory
+  createTaskCategory,
+  findNextAvailableDay,
+  rescheduleTask,
+  findMissedTasks,
+  autoRescheduleMissedTasks,
+  executeReschedulePlan,
+  loadCatchUpQueue
 } from './storage.js';
 import {
   calculateOverallProgress,
@@ -78,7 +85,8 @@ import {
   showError,
   showWarning,
   showInfo,
-  showConfirm
+  showConfirm,
+  showToastWithAction
 } from './toast.js';
 import {
   validateSBABulkUpload,
@@ -169,20 +177,25 @@ export function updateCatchUpQueue() {
   } else {
     panel.style.display = 'block';
 
-    content.innerHTML = catchUpQueue.map(item => `
-      <div class="catch-up-item">
-        <div class="catch-up-item-info">
-          <div class="catch-up-item-title">${item.original_topic}</div>
-          <div class="catch-up-item-meta">
-            Original: ${formatDateShort(new Date(item.original_date))} →
-            Rescheduled to: ${formatDateShort(new Date(item.new_date))}
+    content.innerHTML = `
+      <div class="catch-up-actions-row">
+        <button onclick="window.showAutoRescheduleModal()" class="btn btn--primary btn--sm">🚀 Auto-reschedule Missed Tasks</button>
+      </div>
+      ${catchUpQueue.map(item => `
+        <div class="catch-up-item">
+          <div class="catch-up-item-info">
+            <div class="catch-up-item-title">${item.original_topic}</div>
+            <div class="catch-up-item-meta">
+              Original: ${formatDateShort(new Date(item.original_date))} →
+              Rescheduled to: ${formatDateShort(new Date(item.new_date))}
+            </div>
+          </div>
+          <div class="catch-up-actions">
+            <button class="btn btn--sm btn--outline" onclick="window.removeCatchUpItem('${item.id}')">Remove</button>
           </div>
         </div>
-        <div class="catch-up-actions">
-          <button class="btn btn--sm btn--outline" onclick="window.removeCatchUpItem('${item.id}')">Remove</button>
-        </div>
-      </div>
-    `).join('');
+      `).join('')}
+    `;
   }
 }
 
@@ -239,6 +252,9 @@ export async function switchView(viewName) {
   };
 
   document.getElementById(viewMap[viewName]).style.display = 'block';
+
+  // Save to localStorage
+  localStorage.setItem('studyplan-last-view', viewName);
 
   // Render the view
   if (viewName === 'daily') renderDailyView();
@@ -318,8 +334,37 @@ export function renderDailyView() {
   console.log('[renderDailyView] SBA:', sbaEntries);
   console.log('[renderDailyView] Telegram:', telegramQuestions);
   
+  // Calculate statistics for sticky summary bar
+  let totalTasks = 0;
+  let completedTasks = 0;
+  let totalMinutes = 0;
+  let completedMinutes = 0;
+  
+  categories.forEach(cat => {
+    const catTime = parseTimeEstimate(cat.time_estimate);
+    totalMinutes += catTime;
+    
+    cat.tasks.forEach(task => {
+      totalTasks++;
+      if (task.completed) {
+        completedTasks++;
+        completedMinutes += parseTimeEstimate(task.time_estimate);
+      }
+    });
+  });
+  
+  // Update sticky summary bar
+  const summaryBar = document.getElementById('dailySummaryBar');
+  if (totalTasks > 0) {
+    summaryBar.style.display = 'flex';
+    document.getElementById('summaryTasks').textContent = `${completedTasks}/${totalTasks}`;
+    document.getElementById('summaryTimeDone').textContent = formatMinutesToHours(completedMinutes);
+    document.getElementById('summaryTimeRemaining').textContent = formatMinutesToHours(totalMinutes - completedMinutes);
+  } else {
+    summaryBar.style.display = 'none';
+  }
+  
   // Calculate total time for the day
-  const totalMinutes = calculateTotalTimeForDay(categories);
   const timeDisplay = totalMinutes > 0 ? 
     `<div class="daily-time-total">⏱ Total time today: ${formatMinutesToHours(totalMinutes)}</div>` : '';
 
@@ -354,6 +399,7 @@ export function renderDailyView() {
                   <div class="task-meta">
                     <span>⏱ ${task.time_estimate}</span>
                     ${task.work_suitable ? '<span class="task-badge work-suitable">✓ Work Suitable</span>' : ''}
+                    <button class="btn btn--sm btn--accent" onclick="window.showRescheduleTaskModal('${task.id}', '${task.task_name}', '${dateStr}')" title="Reschedule this task">📅 Reschedule</button>
                     <button class="btn btn--sm btn--secondary" onclick="window.editTask('${task.id}')">Edit</button>
                     <button class="btn btn--sm btn--outline" onclick="window.deleteTaskConfirm('${task.id}')">Delete</button>
                   </div>
@@ -564,6 +610,10 @@ export async function changeDay(delta) {
   const viewingDate = getViewingDate();
   viewingDate.setDate(viewingDate.getDate() + delta);
   setViewingDate(viewingDate);
+  
+  // Save to localStorage
+  localStorage.setItem('studyplan-last-date', formatDateISO(viewingDate));
+  
   await loadTasksForDateHandler(viewingDate);
   renderDailyView();
   renderRevisionResources();
@@ -1874,12 +1924,39 @@ export async function saveDayType(dateStr) {
 
 export async function toggleTaskCompletionHandler(taskId) {
   try {
+    // Store previous state before toggling
+    const { data: task, error: fetchError } = await supabase
+      .from('tasks')
+      .select('completed')
+      .eq('id', taskId)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    
+    const previousState = task.completed;
+    
+    // Toggle the task
     await toggleTaskCompletion(taskId);
     await loadTasksForDateHandler(getViewingDate());
     renderDailyView();
     updateHeaderStats();
+    
+    // Show undo toast
+    showToastWithAction(
+      previousState ? 'Task marked as incomplete' : 'Task marked as complete',
+      'Undo',
+      async () => {
+        // Undo the toggle
+        await toggleTaskCompletion(taskId);
+        await loadTasksForDateHandler(getViewingDate());
+        renderDailyView();
+        updateHeaderStats();
+      },
+      6000
+    );
   } catch (error) {
     console.error('Error toggling task:', error);
+    showError('Failed to update task: ' + error.message);
   }
 }
 
@@ -1904,23 +1981,75 @@ export async function updateTelegramHeaderStatsHandler() {
 
 export async function handleSBAScheduleToggle(id) {
   try {
+    // Store previous state
+    const { data: entry, error: fetchError } = await supabase
+      .from('sba_schedule')
+      .select('completed')
+      .eq('id', id)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    
+    const previousState = entry.completed;
+    
+    // Toggle
     await toggleSBAScheduleCompletion(id);
     await loadTasksForDateHandler(getViewingDate());
     renderDailyView();
     await updateSBAHeaderStatsHandler();
+    
+    // Show undo toast
+    showToastWithAction(
+      previousState ? 'SBA marked as incomplete' : 'SBA marked as complete',
+      'Undo',
+      async () => {
+        await toggleSBAScheduleCompletion(id);
+        await loadTasksForDateHandler(getViewingDate());
+        renderDailyView();
+        await updateSBAHeaderStatsHandler();
+      },
+      6000
+    );
   } catch (error) {
     console.error('Error toggling SBA schedule:', error);
+    showError('Failed to update SBA: ' + error.message);
   }
 }
 
 export async function handleTelegramToggle(id) {
   try {
+    // Store previous state
+    const { data: question, error: fetchError } = await supabase
+      .from('telegram_questions')
+      .select('completed')
+      .eq('id', id)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    
+    const previousState = question.completed;
+    
+    // Toggle
     await toggleTelegramQuestionCompletion(id);
     await loadTasksForDateHandler(getViewingDate());
     renderDailyView();
     await updateTelegramHeaderStatsHandler();
+    
+    // Show undo toast
+    showToastWithAction(
+      previousState ? 'Telegram question marked as incomplete' : 'Telegram question marked as complete',
+      'Undo',
+      async () => {
+        await toggleTelegramQuestionCompletion(id);
+        await loadTasksForDateHandler(getViewingDate());
+        renderDailyView();
+        await updateTelegramHeaderStatsHandler();
+      },
+      6000
+    );
   } catch (error) {
     console.error('Error toggling telegram question:', error);
+    showError('Failed to update telegram question: ' + error.message);
   }
 }
 
@@ -1982,5 +2111,263 @@ export async function loadAllUserData() {
   
   appState.sbaSchedule[dateStr] = sbaEntries || [];
   appState.telegramQuestions[dateStr] = telegramQuestions || [];
+}
+
+// ==========================================================
+// RESCHEDULE TASK MODAL
+// ==========================================================
+
+export async function showRescheduleTaskModal(taskId, taskName, currentDate) {
+  const currentUser = getCurrentUser();
+  
+  try {
+    showLoading(true);
+    
+    // Find next available day
+    const suggestion = await findNextAvailableDay(currentUser.id, currentDate);
+    
+    showLoading(false);
+    
+    // Create modal
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'rescheduleTaskModal';
+    modal.style.display = 'flex';
+    
+    const suggestedDate = new Date(suggestion.date);
+    const formattedSuggestion = suggestedDate.toLocaleDateString('en-GB', { 
+      weekday: 'long', 
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric' 
+    });
+    
+    const dayTypeLabel = {
+      'off': 'Off Day',
+      'revision': 'Revision Day',
+      'light': 'Light Study Day'
+    }[suggestion.dayType] || 'Study Day';
+    
+    modal.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Reschedule Task</h2>
+          <button class="modal-close" onclick="document.getElementById('rescheduleTaskModal').remove()">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="reschedule-info">
+            <h3>Task: ${taskName}</h3>
+            <p class="text-secondary">Currently scheduled for: ${new Date(currentDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+          </div>
+          
+          <div class="suggested-date-card">
+            <h4>📅 Suggested Date</h4>
+            <div class="suggested-date-details">
+              <div class="suggested-date-main">${formattedSuggestion}</div>
+              <div class="suggested-date-meta">
+                <span class="day-type-badge ${suggestion.dayType}-day">${dayTypeLabel}</span>
+                <span class="capacity-info">Current load: ${suggestion.currentLoad}min • Available: ${suggestion.availableCapacity}min</span>
+                ${suggestion.isFallback ? '<span class="fallback-warning">⚠️ No ideal day found within 60 days</span>' : ''}
+              </div>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Or choose a different date:</label>
+            <input type="date" id="rescheduleNewDate" class="form-control" value="${suggestion.date}">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn--outline" onclick="document.getElementById('rescheduleTaskModal').remove()">Cancel</button>
+          <button class="btn btn--primary" onclick="window.confirmRescheduleTask('${taskId}', '${currentDate}')">Confirm Reschedule</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Close on background click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.remove();
+      }
+    });
+    
+  } catch (error) {
+    showLoading(false);
+    showError('Failed to find available date: ' + error.message);
+  }
+}
+
+export async function confirmRescheduleTask(taskId, originalDate) {
+  const newDate = document.getElementById('rescheduleNewDate').value;
+  
+  if (!newDate) {
+    showError('Please select a date');
+    return;
+  }
+  
+  const currentUser = getCurrentUser();
+  
+  try {
+    showLoading(true);
+    document.getElementById('rescheduleTaskModal').remove();
+    
+    await rescheduleTask(currentUser.id, taskId, newDate, originalDate);
+    
+    // Reload tasks for both dates
+    await loadTasksForDateHandler(new Date(originalDate));
+    await loadTasksForDateHandler(new Date(newDate));
+    
+    // Update catch-up queue
+    const catchUpQueue = await loadCatchUpQueue(currentUser.id);
+    setCatchUpQueue(catchUpQueue);
+    updateCatchUpQueue();
+    
+    // Re-render current view
+    renderDailyView();
+    
+    showSuccess(`Task rescheduled to ${new Date(newDate).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}`);
+    showLoading(false);
+  } catch (error) {
+    showLoading(false);
+    showError('Failed to reschedule task: ' + error.message);
+  }
+}
+
+// ==========================================================
+// AUTO-RESCHEDULE MODAL (Bulk Missed Tasks)
+// ==========================================================
+
+export async function showAutoRescheduleModal() {
+  const currentUser = getCurrentUser();
+  
+  try {
+    showLoading(true);
+    
+    // Find all missed tasks and generate reschedule plan
+    const result = await autoRescheduleMissedTasks(currentUser.id);
+    
+    showLoading(false);
+    
+    if (result.tasks.length === 0) {
+      showInfo('No missed tasks found! You\'re all caught up! 🎉');
+      return;
+    }
+    
+    // Create modal
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'autoRescheduleModal';
+    modal.style.display = 'flex';
+    
+    // Group plan by new date for better display
+    const planByDate = {};
+    result.plan.forEach(item => {
+      if (!planByDate[item.newDate]) {
+        planByDate[item.newDate] = [];
+      }
+      planByDate[item.newDate].push(item);
+    });
+    
+    modal.innerHTML = `
+      <div class="modal-content modal-large">
+        <div class="modal-header">
+          <h2>Auto-Reschedule Missed Tasks</h2>
+          <button class="modal-close" onclick="document.getElementById('autoRescheduleModal').remove()">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="auto-reschedule-summary">
+            <h3>📊 Summary</h3>
+            <p><strong>${result.tasks.length} missed tasks</strong> will be rescheduled across <strong>${Object.keys(planByDate).length} days</strong></p>
+            <p class="text-secondary">Tasks will be placed on OFF/REVISION/LIGHT days with available capacity.</p>
+          </div>
+          
+          <div class="reschedule-plan-preview">
+            <h4>📅 Reschedule Plan Preview</h4>
+            ${Object.keys(planByDate).sort().map(date => {
+              const items = planByDate[date];
+              const formattedDate = new Date(date).toLocaleDateString('en-GB', { 
+                weekday: 'long', 
+                day: 'numeric', 
+                month: 'long', 
+                year: 'numeric' 
+              });
+              return `
+                <div class="plan-date-group">
+                  <div class="plan-date-header">${formattedDate}</div>
+                  <ul class="plan-task-list">
+                    ${items.map(item => `
+                      <li class="plan-task-item">
+                        <span class="plan-task-name">${item.task.task_name}</span>
+                        <span class="plan-task-meta">
+                          <span class="plan-task-category">${item.categoryName}</span>
+                          <span class="plan-task-time">⏱ ${item.timeEstimate}</span>
+                          <span class="plan-task-original">from ${new Date(item.originalDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+                        </span>
+                      </li>
+                    `).join('')}
+                  </ul>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn--outline" onclick="document.getElementById('autoRescheduleModal').remove()">Cancel</button>
+          <button class="btn btn--primary" onclick="window.executeAutoReschedule()">✓ Confirm &amp; Reschedule All</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Store plan in modal for later use
+    modal.dataset.plan = JSON.stringify(result.plan);
+    
+    // Close on background click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.remove();
+      }
+    });
+    
+  } catch (error) {
+    showLoading(false);
+    showError('Failed to generate reschedule plan: ' + error.message);
+  }
+}
+
+export async function executeAutoReschedule() {
+  const modal = document.getElementById('autoRescheduleModal');
+  const plan = JSON.parse(modal.dataset.plan);
+  const currentUser = getCurrentUser();
+  
+  try {
+    showLoading(true);
+    modal.remove();
+    
+    const result = await executeReschedulePlan(currentUser.id, plan);
+    
+    if (result.errors.length > 0) {
+      console.error('Some tasks failed to reschedule:', result.errors);
+    }
+    
+    // Reload catch-up queue and current view
+    const catchUpQueue = await loadCatchUpQueue(currentUser.id);
+    setCatchUpQueue(catchUpQueue);
+    updateCatchUpQueue();
+    
+    // Reload current viewing date tasks
+    await loadTasksForDateHandler(getViewingDate());
+    renderDailyView();
+    updateHeaderStats();
+    
+    showSuccess(`Successfully rescheduled ${result.successCount} tasks!`);
+    showLoading(false);
+  } catch (error) {
+    showLoading(false);
+    showError('Failed to execute reschedule plan: ' + error.message);
+  }
 }
 

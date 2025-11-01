@@ -1348,3 +1348,256 @@ export async function createPlaceholders(userId, dates, type, data = {}) {
   }
 }
 
+// ============================================
+// Reschedule Functions
+// ============================================
+
+// Parse time estimate string to minutes
+function parseTimeToMinutes(timeStr) {
+  if (!timeStr) return 0;
+  
+  let minutes = 0;
+  const hourMatch = timeStr.match(/(\d+)\s*h/i);
+  const minMatch = timeStr.match(/(\d+)\s*m/i);
+  
+  if (hourMatch) minutes += parseInt(hourMatch[1]) * 60;
+  if (minMatch) minutes += parseInt(minMatch[1]);
+  
+  return minutes;
+}
+
+// Calculate total time load for a day
+async function calculateDayTimeLoad(userId, dateStr) {
+  try {
+    const categories = await loadTasksForDate(userId, dateStr);
+    let totalMinutes = 0;
+    
+    categories.forEach(cat => {
+      totalMinutes += parseTimeToMinutes(cat.time_estimate);
+    });
+    
+    return totalMinutes;
+  } catch (error) {
+    console.error('Error calculating day time load:', error);
+    return 0;
+  }
+}
+
+// Find next available day for rescheduling
+export async function findNextAvailableDay(userId, startDate, maxCapacityMinutes = 180) {
+  try {
+    const start = new Date(startDate);
+    start.setDate(start.getDate() + 1); // Start from tomorrow
+    
+    // Look up to 60 days ahead
+    const maxDays = 60;
+    
+    for (let i = 0; i < maxDays; i++) {
+      const checkDate = new Date(start);
+      checkDate.setDate(start.getDate() + i);
+      const dateStr = formatDateISO(checkDate);
+      
+      // Load schedule for this day
+      const { data: scheduleData, error: scheduleError } = await supabase
+        .from('daily_schedule')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('date', dateStr)
+        .maybeSingle();
+      
+      if (scheduleError) continue;
+      
+      // Check if day type is suitable (off, revision, light)
+      if (scheduleData && ['off', 'revision', 'light'].includes(scheduleData.type)) {
+        // Check current load
+        const currentLoad = await calculateDayTimeLoad(userId, dateStr);
+        
+        if (currentLoad < maxCapacityMinutes) {
+          return {
+            date: dateStr,
+            currentLoad,
+            availableCapacity: maxCapacityMinutes - currentLoad,
+            dayType: scheduleData.type
+          };
+        }
+      }
+    }
+    
+    // If no suitable day found, return tomorrow as fallback
+    const tomorrow = new Date(start);
+    const tomorrowStr = formatDateISO(tomorrow);
+    const tomorrowLoad = await calculateDayTimeLoad(userId, tomorrowStr);
+    
+    return {
+      date: tomorrowStr,
+      currentLoad: tomorrowLoad,
+      availableCapacity: Math.max(0, maxCapacityMinutes - tomorrowLoad),
+      dayType: 'off',
+      isFallback: true
+    };
+  } catch (error) {
+    console.error('Error finding next available day:', error);
+    throw error;
+  }
+}
+
+// Reschedule a task to a new date
+export async function rescheduleTask(userId, taskId, newDate, originalDate) {
+  try {
+    const newDateStr = typeof newDate === 'string' ? newDate : formatDateISO(newDate);
+    const originalDateStr = typeof originalDate === 'string' ? originalDate : formatDateISO(originalDate);
+    
+    // Get task details
+    const { data: task, error: taskError } = await supabase
+      .from('tasks')
+      .select('*, task_categories!inner(category_name)')
+      .eq('id', taskId)
+      .single();
+    
+    if (taskError) throw taskError;
+    
+    // Update task date
+    const { error: updateError } = await supabase
+      .from('tasks')
+      .update({ date: newDateStr })
+      .eq('id', taskId);
+    
+    if (updateError) throw updateError;
+    
+    // Add to catch-up queue for tracking
+    const categoryName = task.task_categories?.category_name || 'Task';
+    const { error: queueError } = await supabase
+      .from('catch_up_queue')
+      .insert({
+        user_id: userId,
+        original_date: originalDateStr,
+        original_topic: `${categoryName}: ${task.task_name}`,
+        new_date: newDateStr,
+        time_estimate: task.time_estimate,
+        items: [{ task_id: taskId, task_name: task.task_name }]
+      });
+    
+    if (queueError) console.warn('Failed to add to catch-up queue:', queueError);
+    
+    return { success: true, newDate: newDateStr };
+  } catch (error) {
+    console.error('Error rescheduling task:', error);
+    throw error;
+  }
+}
+
+// Find all missed (incomplete) tasks before today
+export async function findMissedTasks(userId) {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = formatDateISO(today);
+    
+    // Get all incomplete tasks before today
+    const { data: tasks, error } = await supabase
+      .from('tasks')
+      .select('*, task_categories!inner(category_name, time_estimate)')
+      .eq('user_id', userId)
+      .eq('completed', false)
+      .lt('date', todayStr)
+      .order('date', { ascending: true });
+    
+    if (error) throw error;
+    
+    return tasks || [];
+  } catch (error) {
+    console.error('Error finding missed tasks:', error);
+    return [];
+  }
+}
+
+// Auto-reschedule all missed tasks
+export async function autoRescheduleMissedTasks(userId, maxCapacityMinutes = 180) {
+  try {
+    const today = new Date();
+    const missedTasks = await findMissedTasks(userId);
+    
+    if (missedTasks.length === 0) {
+      return { rescheduled: 0, tasks: [] };
+    }
+    
+    const reschedulePlan = [];
+    let currentScanDate = new Date(today);
+    
+    // Group tasks by original date
+    const tasksByDate = {};
+    missedTasks.forEach(task => {
+      if (!tasksByDate[task.date]) {
+        tasksByDate[task.date] = [];
+      }
+      tasksByDate[task.date].push(task);
+    });
+    
+    // For each date's tasks, find suitable reschedule dates
+    for (const [originalDate, tasks] of Object.entries(tasksByDate)) {
+      for (const task of tasks) {
+        const taskTime = parseTimeToMinutes(task.time_estimate);
+        
+        // Find next available day starting from current scan date
+        const availableDay = await findNextAvailableDay(userId, formatDateISO(currentScanDate), maxCapacityMinutes);
+        
+        // Check if this day has enough capacity for this specific task
+        if (availableDay.availableCapacity >= taskTime) {
+          reschedulePlan.push({
+            task,
+            originalDate,
+            newDate: availableDay.date,
+            categoryName: task.task_categories?.category_name || 'Unknown',
+            timeEstimate: task.time_estimate
+          });
+          
+          // Update available capacity for this day (for next iteration)
+          availableDay.availableCapacity -= taskTime;
+        } else {
+          // Move scan date forward if current day doesn't have capacity
+          currentScanDate = new Date(availableDay.date);
+          currentScanDate.setDate(currentScanDate.getDate() + 1);
+          
+          // Retry finding a day for this task
+          const nextDay = await findNextAvailableDay(userId, formatDateISO(currentScanDate), maxCapacityMinutes);
+          reschedulePlan.push({
+            task,
+            originalDate,
+            newDate: nextDay.date,
+            categoryName: task.task_categories?.category_name || 'Unknown',
+            timeEstimate: task.time_estimate
+          });
+        }
+      }
+    }
+    
+    return { rescheduled: 0, plan: reschedulePlan, tasks: missedTasks };
+  } catch (error) {
+    console.error('Error auto-rescheduling missed tasks:', error);
+    throw error;
+  }
+}
+
+// Execute the reschedule plan
+export async function executeReschedulePlan(userId, plan) {
+  try {
+    let successCount = 0;
+    const errors = [];
+    
+    for (const item of plan) {
+      try {
+        await rescheduleTask(userId, item.task.id, item.newDate, item.originalDate);
+        successCount++;
+      } catch (error) {
+        errors.push({ task: item.task.task_name, error: error.message });
+      }
+    }
+    
+    return { successCount, errors };
+  } catch (error) {
+    console.error('Error executing reschedule plan:', error);
+    throw error;
+  }
+}
+
+
