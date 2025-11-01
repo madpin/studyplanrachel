@@ -91,6 +91,25 @@
                     You've got this!
                 </div>
                 <div class="header-actions">
+                    <div class="theme-selector">
+                        <button id="themeToggle" class="btn btn--outline btn--sm theme-toggle" title="Change theme">
+                            <span class="theme-icon">🎨</span>
+                        </button>
+                        <div id="themeMenu" class="theme-menu" style="display: none;">
+                            <button class="theme-option" data-theme="ocean">
+                                <span class="theme-preview" style="background: linear-gradient(135deg, #1d4ed8 0%, #7c3aed 100%);"></span>
+                                <span class="theme-name">Ocean Blue</span>
+                            </button>
+                            <button class="theme-option" data-theme="navy">
+                                <span class="theme-preview" style="background: linear-gradient(135deg, #1e3a8a 0%, #7e22ce 100%);"></span>
+                                <span class="theme-name">Navy Purple</span>
+                            </button>
+                            <button class="theme-option" data-theme="sky">
+                                <span class="theme-preview" style="background: linear-gradient(135deg, #0369a1 0%, #a855f7 100%);"></span>
+                                <span class="theme-name">Sky Lavender</span>
+                            </button>
+                        </div>
+                    </div>
                     <button onclick="showSettingsModal()" class="btn btn--secondary btn--sm">⚙️ Settings</button>
                     <button onclick="showOnboardingManually()" class="btn btn--outline btn--sm" title="Re-seed tasks from template">🔄 Re-run Setup</button>
                     <button onclick="handleLogout()" class="btn btn--outline btn--sm">Logout</button>

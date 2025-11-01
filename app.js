@@ -67,6 +67,61 @@ import { showToast, showSuccess, showError, showWarning, showConfirm } from './m
 let hasInitialized = false;
 
 // ==========================================================
+// THEME MANAGEMENT
+// ==========================================================
+
+function initializeTheme() {
+  // Load theme from localStorage or default to 'ocean'
+  const savedTheme = localStorage.getItem('studyplan-theme') || 'ocean';
+  applyTheme(savedTheme);
+  
+  // Setup theme toggle
+  const themeToggle = document.getElementById('themeToggle');
+  const themeMenu = document.getElementById('themeMenu');
+  
+  if (themeToggle && themeMenu) {
+    themeToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      themeMenu.style.display = themeMenu.style.display === 'none' ? 'block' : 'none';
+    });
+    
+    // Close theme menu when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!themeToggle.contains(e.target) && !themeMenu.contains(e.target)) {
+        themeMenu.style.display = 'none';
+      }
+    });
+    
+    // Theme option handlers
+    document.querySelectorAll('.theme-option').forEach(option => {
+      option.addEventListener('click', () => {
+        const theme = option.dataset.theme;
+        applyTheme(theme);
+        localStorage.setItem('studyplan-theme', theme);
+        themeMenu.style.display = 'none';
+      });
+    });
+  }
+}
+
+function applyTheme(theme) {
+  // Set data-theme attribute on html element for broader scope
+  document.documentElement.setAttribute('data-theme', theme);
+  document.body.setAttribute('data-theme', theme);
+  
+  // Update active state in theme menu
+  document.querySelectorAll('.theme-option').forEach(option => {
+    if (option.dataset.theme === theme) {
+      option.classList.add('active');
+    } else {
+      option.classList.remove('active');
+    }
+  });
+  
+  console.log('Theme applied:', theme);
+}
+
+// ==========================================================
 // INITIALIZATION
 // ==========================================================
 
@@ -663,6 +718,7 @@ setInitializeAppCallback(initializeApp);
 // Initialize auth system when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   console.log('DOM Content Loaded - Setting up app...');
+  initializeTheme();
   setupEventListeners();
   setupKeyboardShortcuts();
   initializeAuth();

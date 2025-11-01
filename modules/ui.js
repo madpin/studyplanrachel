@@ -615,6 +615,27 @@ export async function renderWeeklyView() {
     const telegramCount = telegramQuestions.length;
     const completedTelegram = telegramQuestions.filter(q => q.completed).length;
 
+    // Extract topics from tasks
+    const topics = [];
+    categories.forEach(cat => {
+      cat.tasks.forEach(task => {
+        if (task.title) {
+          topics.push(task.title);
+        }
+      });
+    });
+
+    // Also add SBA modules if any
+    sbaEntries.forEach(sba => {
+      if (sba.module_name) {
+        topics.push(`${sba.module_name} (SBA)`);
+      }
+    });
+
+    // Limit to first 5 topics for display
+    const displayTopics = topics.slice(0, 5);
+    const hasMoreTopics = topics.length > 5;
+
     return `
       <div class="week-day-card" onclick="window.viewDayFromWeek('${dateStr}')">
         <div class="week-day-header">${dayName}</div>
@@ -638,6 +659,15 @@ export async function renderWeeklyView() {
           ${totalTasks === 0 && sbaCount === 0 && telegramCount === 0 ? 
             '<div class="week-item-empty">No items scheduled</div>' : ''}
         </div>
+        ${displayTopics.length > 0 ? `
+          <div class="week-day-topics">
+            <strong>Topics:</strong>
+            <ul class="topics-list">
+              ${displayTopics.map(topic => `<li>${topic}</li>`).join('')}
+              ${hasMoreTopics ? `<li class="more-topics">+${topics.length - 5} more...</li>` : ''}
+            </ul>
+          </div>
+        ` : ''}
       </div>
     `;
   }).join('');
