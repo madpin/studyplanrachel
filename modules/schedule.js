@@ -227,8 +227,17 @@ export function formatDateShort(date) {
   return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
+/**
+ * Format date as YYYY-MM-DD in LOCAL timezone
+ * Important: toISOString() uses UTC which can cause date shifts
+ * e.g., 2025-11-01 00:00 in GMT-5 becomes 2025-10-31 in UTC
+ */
 export function formatDateISO(date) {
-  return date.toISOString().split('T')[0];
+  if (typeof date === 'string') return date;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export function getDaysBetween(date1, date2) {

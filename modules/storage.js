@@ -38,25 +38,483 @@ export async function saveUserSettings(userId, settings) {
 // Daily Schedule
 // ============================================
 
+// Clear all seeded data for a user (useful for re-seeding)
+export async function clearUserData(userId) {
+  try {
+    console.log('Clearing existing user data...');
+    
+    // Delete in order to respect foreign key constraints
+    const { error: tasksError } = await supabase
+      .from('tasks')
+      .delete()
+      .eq('user_id', userId);
+    
+    if (tasksError) console.error('Error deleting tasks:', tasksError);
+    
+    const { error: categoriesError } = await supabase
+      .from('task_categories')
+      .delete()
+      .eq('user_id', userId);
+    
+    if (categoriesError) console.error('Error deleting task categories:', categoriesError);
+    
+    const { error: sbaError } = await supabase
+      .from('sba_schedule')
+      .delete()
+      .eq('user_id', userId);
+    
+    if (sbaError) console.error('Error deleting SBA schedule:', sbaError);
+    
+    const { error: telegramError } = await supabase
+      .from('telegram_questions')
+      .delete()
+      .eq('user_id', userId);
+    
+    if (telegramError) console.error('Error deleting Telegram questions:', telegramError);
+    
+    const { error: scheduleError } = await supabase
+      .from('daily_schedule')
+      .delete()
+      .eq('user_id', userId);
+    
+    if (scheduleError) console.error('Error deleting daily schedule:', scheduleError);
+    
+    console.log('User data cleared successfully');
+  } catch (error) {
+    console.error('Error clearing user data:', error);
+    throw error;
+  }
+}
+
 export async function seedDailySchedule(userId, templateDetailedSchedule) {
   try {
     const scheduleEntries = Object.keys(templateDetailedSchedule).map(date => ({
       user_id: userId,
       date: date,
-      topics: templateDetailedSchedule[date].topics,
-      type: templateDetailedSchedule[date].type,
-      resources: templateDetailedSchedule[date].resources
+      topics: templateDetailedSchedule[date].topics || [],
+      type: templateDetailedSchedule[date].type || 'off',
+      resources: templateDetailedSchedule[date].resources || []
     }));
     
     const { error } = await supabase
       .from('daily_schedule')
-      .upsert(scheduleEntries);
+      .upsert(scheduleEntries, { 
+        onConflict: 'user_id,date',
+        ignoreDuplicates: false // Update existing entries
+      });
     
     if (error) throw error;
     
     console.log(`Seeded ${scheduleEntries.length} days of schedule`);
   } catch (error) {
     console.error('Error seeding daily schedule:', error);
+    throw error;
+  }
+}
+
+// Seed tasks and categories from template with detailed task generation (from legacy data.js)
+export async function seedTasksFromTemplate(userId, templateDetailedSchedule, modules) {
+  try {
+    let totalTasks = 0;
+    let skippedDays = 0;
+    
+    // Get module lookup by name
+    const modulesByName = {};
+    modules.forEach(mod => {
+      modulesByName[mod.name] = mod.id;
+    });
+    
+    for (const [date, dayData] of Object.entries(templateDetailedSchedule)) {
+      const topics = dayData.topics || [];
+      const resources = dayData.resources || [];
+      const dayType = dayData.type;
+      
+      if (topics.length === 0) continue; // Skip days with no topics
+      
+      // Check if tasks already exist for this date - PRESERVE EXISTING
+      const { data: existingCategories, error: checkError } = await supabase
+        .from('task_categories')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('date', date)
+        .limit(1);
+      
+      if (checkError) {
+        console.error(`Error checking existing tasks for ${date}:`, checkError);
+        continue;
+      }
+      
+      if (existingCategories && existingCategories.length > 0) {
+        console.log(`Skipping ${date} - tasks already exist (preserving your data)`);
+        skippedDays++;
+        continue; // Skip this date if tasks already exist
+      }
+      
+      const isBrazil = dayType === 'trip' || dayType === 'trip-end';
+      const isWork = dayType === 'work';
+      const isRest = dayType === 'rest' || dayType === 'exam-eve';
+      const isRevision = dayType === 'revision';
+      const isIntensive = dayType === 'off' || dayType === 'intensive' || dayType === 'intensive-post';
+      
+      let sortOrder = 0;
+      
+      // Generate tasks for each topic based on day type (matching legacy getDailyTasks logic)
+      for (const topic of topics) {
+        // Extract module name (part before colon)
+        const colonIndex = topic.indexOf(':');
+        const moduleName = colonIndex > 0 ? topic.substring(0, colonIndex).trim() : topic;
+        const topicName = colonIndex > 0 ? topic.substring(colonIndex + 1).trim() : topic;
+        
+        // Determine category time estimate
+        let categoryTime = '2h';
+        if (isBrazil && resources.length === 0) categoryTime = '0 min';
+        else if (isBrazil) categoryTime = '0-30 min (optional)';
+        else if (isRest) categoryTime = '30-60 min total';
+        else if (isWork) categoryTime = '50-60 min';
+        else if (isRevision) categoryTime = '2-3 hours';
+        else if (isIntensive) categoryTime = '2-3 hours';
+        
+        // Create category
+        const { data: category, error: catError } = await supabase
+          .from('task_categories')
+          .insert({
+            user_id: userId,
+            date: date,
+            category_name: topic,
+            time_estimate: categoryTime,
+            sort_order: sortOrder++
+          })
+          .select()
+          .single();
+        
+        if (catError) {
+          console.error(`Error creating category for ${date}:`, catError);
+          continue;
+        }
+        
+        // Generate tasks based on day type and resources
+        const categoryTasks = [];
+        
+        if (isBrazil && resources.length === 0) {
+          // Rest day during trip
+          categoryTasks.push({
+            task_name: 'Enjoy your trip! No study required today.',
+            time_estimate: '0 min',
+            work_suitable: true
+          });
+        } else if (isBrazil) {
+          // Optional light study during trip
+          resources.forEach(r => {
+            categoryTasks.push({
+              task_name: r,
+              time_estimate: '10-15 min',
+              work_suitable: true
+            });
+          });
+        } else if (isRest) {
+          // Rest or exam-eve day
+          resources.forEach(r => {
+            categoryTasks.push({
+              task_name: r,
+              time_estimate: '15-30 min',
+              work_suitable: true
+            });
+          });
+        } else if (isWork) {
+          // Work day - minimal resources only
+          if (resources.includes('Lecture Summary')) {
+            categoryTasks.push({
+              task_name: 'Lecture Summary',
+              time_estimate: '20-30 min',
+              work_suitable: true
+            });
+          }
+          if (resources.includes('Podcast')) {
+            categoryTasks.push({
+              task_name: 'Podcast',
+              time_estimate: '20-30 min',
+              work_suitable: true
+            });
+          }
+          if (resources.includes('Telegram Q')) {
+            categoryTasks.push({
+              task_name: 'Telegram Q',
+              time_estimate: '20 min',
+              work_suitable: true
+            });
+          }
+        } else if (isRevision) {
+          // Revision day - mock exam focus
+          if (resources.includes('Full Mock Exam')) {
+            categoryTasks.push({
+              task_name: 'Full Mock Exam',
+              time_estimate: '90-120 min',
+              work_suitable: false
+            });
+          }
+          if (resources.includes('Mock Exam option')) {
+            categoryTasks.push({
+              task_name: 'Mock Exam (optional)',
+              time_estimate: '90 min',
+              work_suitable: false
+            });
+          }
+          categoryTasks.push({
+            task_name: 'Review incorrect answers',
+            time_estimate: '30-45 min',
+            work_suitable: true
+          });
+          if (resources.includes('Lecture Summary') || resources.includes('Lecture Summary review')) {
+            categoryTasks.push({
+              task_name: 'Lecture Summary review',
+              time_estimate: '20-30 min',
+              work_suitable: true
+            });
+          }
+          if (resources.includes('Podcast')) {
+            categoryTasks.push({
+              task_name: 'Podcast',
+              time_estimate: '20-30 min',
+              work_suitable: true
+            });
+          }
+        } else if (isIntensive) {
+          // Full study day - comprehensive approach
+          if (resources.includes('Lecture Summary')) {
+            categoryTasks.push({
+              task_name: 'Lecture Summary/Notes',
+              time_estimate: '30-45 min',
+              work_suitable: false
+            });
+          }
+          if (resources.includes('Video')) {
+            categoryTasks.push({
+              task_name: 'Video Lecture',
+              time_estimate: '45-60 min',
+              work_suitable: false
+            });
+          }
+          if (resources.includes('Podcast')) {
+            categoryTasks.push({
+              task_name: 'Podcast',
+              time_estimate: '30-45 min',
+              work_suitable: true
+            });
+          }
+          if (resources.includes('Course Questions')) {
+            categoryTasks.push({
+              task_name: 'Practice Questions',
+              time_estimate: '30-45 min',
+              work_suitable: true
+            });
+          }
+          categoryTasks.push({
+            task_name: 'Create Summary/Flashcards',
+            time_estimate: '20-30 min',
+            work_suitable: false
+          });
+        }
+        
+        // Insert tasks for this category
+        if (categoryTasks.length > 0) {
+          const tasksToInsert = categoryTasks.map((task, idx) => ({
+            user_id: userId,
+            category_id: category.id,
+            module_id: modulesByName[moduleName] || null,
+            date: date,
+            task_name: task.task_name,
+            time_estimate: task.time_estimate,
+            work_suitable: task.work_suitable,
+            completed: false,
+            sort_order: idx
+          }));
+          
+          const { error: taskError } = await supabase
+            .from('tasks')
+            .insert(tasksToInsert);
+          
+          if (taskError) {
+            console.error(`Error creating tasks for ${date}:`, taskError);
+            continue;
+          }
+          
+          totalTasks += tasksToInsert.length;
+        }
+      }
+    }
+    
+    const totalDays = Object.keys(templateDetailedSchedule).length;
+    const addedDays = totalDays - skippedDays;
+    console.log(`Seeded ${totalTasks} tasks across ${addedDays} days (skipped ${skippedDays} existing days to preserve your data)`);
+    return totalTasks;
+  } catch (error) {
+    console.error('Error seeding tasks from template:', error);
+    throw error;
+  }
+}
+
+// Seed SBA schedule from template
+export async function seedSBASchedule(userId, templateSBASchedule) {
+  try {
+    let totalSBA = 0;
+    let skipped = 0;
+    
+    // Prepare SBA entries, checking for existing ones
+    for (const [date, tests] of Object.entries(templateSBASchedule)) {
+      for (const testName of tests) {
+        // Check if this specific SBA entry already exists - PRESERVE EXISTING
+        const { data: existing, error: checkError } = await supabase
+          .from('sba_schedule')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('date', date)
+          .eq('sba_name', testName)
+          .limit(1);
+        
+        if (checkError) {
+          console.error(`Error checking existing SBA for ${date}:`, checkError);
+          continue;
+        }
+        
+        if (existing && existing.length > 0) {
+          skipped++;
+          continue; // Skip if already exists
+        }
+        
+        // Insert new SBA entry
+        const { error: insertError } = await supabase
+          .from('sba_schedule')
+          .insert({
+            user_id: userId,
+            date: date,
+            sba_name: testName,
+            completed: false,
+            is_placeholder: false
+          });
+        
+        if (insertError) {
+          console.error(`Error inserting SBA for ${date}:`, insertError);
+          continue;
+        }
+        
+        totalSBA++;
+      }
+    }
+    
+    console.log(`Seeded ${totalSBA} SBA test entries (skipped ${skipped} existing entries)`);
+    return totalSBA;
+  } catch (error) {
+    console.error('Error seeding SBA schedule:', error);
+    throw error;
+  }
+}
+
+// Seed Telegram questions from template schedule
+export async function seedTelegramQuestions(userId, templateDetailedSchedule) {
+  try {
+    let totalQuestions = 0;
+    let skipped = 0;
+    
+    for (const [date, dayData] of Object.entries(templateDetailedSchedule)) {
+      const resources = dayData.resources || [];
+      const dayType = dayData.type;
+      const isBrazil = dayType === 'trip' || dayType === 'trip-end';
+      const isRest = dayType === 'rest' || dayType === 'exam-eve';
+      
+      // Skip days with no Telegram resources or full rest Brazil days
+      if (!resources.includes('Telegram Q') && !resources.includes('Optional Telegram Q')) {
+        continue;
+      }
+      
+      // Check if Telegram questions already exist for this date - PRESERVE EXISTING
+      const { data: existing, error: checkError } = await supabase
+        .from('telegram_questions')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('date', date)
+        .limit(1);
+      
+      if (checkError) {
+        console.error(`Error checking existing Telegram for ${date}:`, checkError);
+        continue;
+      }
+      
+      if (existing && existing.length > 0) {
+        skipped++;
+        continue; // Skip if already exists for this date
+      }
+      
+      // Prepare entries for this date
+      const telegramEntries = [];
+      
+      // Determine number of question sets and source based on day type
+      if (isBrazil && resources.length > 0) {
+        // Optional light questions during trip
+        telegramEntries.push({
+          user_id: userId,
+          date: date,
+          question_text: 'Optional Telegram Q (10-20 questions)',
+          source: 'Both Groups',
+          completed: false,
+          is_placeholder: true
+        });
+      } else if (isRest) {
+        // Rest or exam-eve - optional questions
+        telegramEntries.push({
+          user_id: userId,
+          date: date,
+          question_text: 'MRCOG Study Group Questions (5-10 questions)',
+          source: 'MRCOG Study Group',
+          completed: false,
+          is_placeholder: true
+        });
+        telegramEntries.push({
+          user_id: userId,
+          date: date,
+          question_text: 'MRCOG Intensive Hour Study Group Questions (5-10 questions)',
+          source: 'MRCOG Intensive Hour Study Group',
+          completed: false,
+          is_placeholder: true
+        });
+      } else {
+        // Regular study days (work, off, intensive, revision)
+        telegramEntries.push({
+          user_id: userId,
+          date: date,
+          question_text: 'MRCOG Study Group Questions (~10 questions)',
+          source: 'MRCOG Study Group',
+          completed: false,
+          is_placeholder: true
+        });
+        telegramEntries.push({
+          user_id: userId,
+          date: date,
+          question_text: 'MRCOG Intensive Hour Study Group Questions (~10 questions)',
+          source: 'MRCOG Intensive Hour Study Group',
+          completed: false,
+          is_placeholder: true
+        });
+      }
+      
+      // Insert entries for this date
+      if (telegramEntries.length > 0) {
+        const { error: insertError } = await supabase
+          .from('telegram_questions')
+          .insert(telegramEntries);
+        
+        if (insertError) {
+          console.error(`Error inserting Telegram questions for ${date}:`, insertError);
+          continue;
+        }
+        
+        totalQuestions += telegramEntries.length;
+      }
+    }
+    
+    console.log(`Seeded ${totalQuestions} Telegram question entries (skipped ${skipped} existing dates)`);
+    return totalQuestions;
+  } catch (error) {
+    console.error('Error seeding Telegram questions:', error);
     throw error;
   }
 }
@@ -103,9 +561,9 @@ export async function updateDayScheduleType(userId, date, newType, currentSchedu
       .upsert({
         user_id: userId,
         date: date,
-        topics: currentSchedule.topics,
+        topics: currentSchedule.topics || [],
         type: newType,
-        resources: currentSchedule.resources
+        resources: currentSchedule.resources || []
       });
 
     if (error) throw error;
@@ -145,6 +603,45 @@ export async function updateModule(moduleId, updates) {
 // Tasks
 // ============================================
 
+// Load all tasks up to today for accurate progress calculation
+export async function loadAllTasksToToday(userId) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = formatDateISO(today);
+  
+  // Get start date (e.g., from user settings or default to 3 months ago)
+  const startDate = new Date();
+  startDate.setMonth(startDate.getMonth() - 3);
+  const startStr = formatDateISO(startDate);
+  
+  try {
+    const { data: categories, error } = await supabase
+      .from('task_categories')
+      .select('*, tasks(*)')
+      .eq('user_id', userId)
+      .gte('date', startStr)
+      .lte('date', todayStr)
+      .order('date')
+      .order('sort_order');
+
+    if (error) throw error;
+    
+    // Group by date for easier access
+    const byDate = {};
+    (categories || []).forEach(cat => {
+      if (!byDate[cat.date]) {
+        byDate[cat.date] = [];
+      }
+      byDate[cat.date].push(cat);
+    });
+    
+    return byDate;
+  } catch (error) {
+    console.error('Error loading all tasks to today:', error);
+    return {};
+  }
+}
+
 export async function loadTasksForDate(userId, date) {
   const dateStr = typeof date === 'string' ? date : formatDateISO(date);
   
@@ -159,13 +656,60 @@ export async function loadTasksForDate(userId, date) {
   return categories || [];
 }
 
-export async function toggleTaskCompletion(taskId, completed) {
-  const { error } = await supabase
-    .from('tasks')
-    .update({ completed })
-    .eq('id', taskId);
+// Load tasks for a date range (optimized for weekly/calendar views)
+export async function loadTasksForDateRange(userId, startDate, endDate) {
+  const startStr = typeof startDate === 'string' ? startDate : formatDateISO(startDate);
+  const endStr = typeof endDate === 'string' ? endDate : formatDateISO(endDate);
+  
+  const { data: categories, error } = await supabase
+    .from('task_categories')
+    .select('*, tasks(*)')
+    .eq('user_id', userId)
+    .gte('date', startStr)
+    .lte('date', endStr)
+    .order('date')
+    .order('sort_order');
 
   if (error) throw error;
+  
+  // Group by date for easier access
+  const byDate = {};
+  (categories || []).forEach(cat => {
+    if (!byDate[cat.date]) {
+      byDate[cat.date] = [];
+    }
+    byDate[cat.date].push(cat);
+  });
+  
+  return byDate;
+}
+
+export async function toggleTaskCompletion(taskId) {
+  try {
+    // Fetch current completion state
+    const { data: task, error: fetchError } = await supabase
+      .from('tasks')
+      .select('completed')
+      .eq('id', taskId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    // Invert the completion state
+    const newCompleted = !task.completed;
+    
+    const { error: updateError } = await supabase
+      .from('tasks')
+      .update({ completed: newCompleted })
+      .eq('id', taskId);
+
+    if (updateError) throw updateError;
+    
+    return newCompleted;
+  } catch (error) {
+    console.error('Error toggling task completion:', error);
+    throw error;
+  }
 }
 
 export async function getModuleProgressStats(userId, moduleId) {
@@ -191,6 +735,89 @@ export async function getModuleProgressStats(userId, moduleId) {
   } catch (error) {
     console.error('Error getting module progress stats:', error);
     return { totalTasks: 0, completedTasks: 0, placeholders: 0, percentage: 0 };
+  }
+}
+
+// Create a new task
+export async function createTask(userId, data) {
+  try {
+    const { data: task, error } = await supabase
+      .from('tasks')
+      .insert({
+        user_id: userId,
+        category_id: data.category_id,
+        module_id: data.module_id || null,
+        date: data.date,
+        task_name: data.task_name,
+        time_estimate: data.time_estimate,
+        work_suitable: data.work_suitable || false,
+        is_placeholder: data.is_placeholder || false,
+        completed: false,
+        sort_order: data.sort_order || 0
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return task;
+  } catch (error) {
+    console.error('Error creating task:', error);
+    throw error;
+  }
+}
+
+// Update a task
+export async function updateTask(taskId, data) {
+  try {
+    const { error } = await supabase
+      .from('tasks')
+      .update(data)
+      .eq('id', taskId);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error updating task:', error);
+    throw error;
+  }
+}
+
+// Delete a task
+export async function deleteTask(taskId) {
+  try {
+    const { error } = await supabase
+      .from('tasks')
+      .delete()
+      .eq('id', taskId);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error deleting task:', error);
+    throw error;
+  }
+}
+
+// Create a new task category
+export async function createTaskCategory(userId, data) {
+  try {
+    const { data: category, error } = await supabase
+      .from('task_categories')
+      .insert({
+        user_id: userId,
+        date: data.date,
+        category_name: data.category_name,
+        time_estimate: data.time_estimate,
+        sort_order: data.sort_order || 0,
+        is_catch_up: data.is_catch_up || false,
+        original_date: data.original_date || null
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return category;
+  } catch (error) {
+    console.error('Error creating task category:', error);
+    throw error;
   }
 }
 
@@ -299,6 +926,19 @@ export async function loadSBASchedule(userId, startDate, endDate) {
     console.error('Error loading SBA schedule:', error);
     return [];
   }
+}
+
+// Load SBA schedule for date range and group by date
+export async function loadSBAScheduleByDate(userId, startDate, endDate) {
+  const schedule = await loadSBASchedule(userId, startDate, endDate);
+  const byDate = {};
+  schedule.forEach(entry => {
+    if (!byDate[entry.date]) {
+      byDate[entry.date] = [];
+    }
+    byDate[entry.date].push(entry);
+  });
+  return byDate;
 }
 
 export async function createSBATest(userId, data) {
@@ -486,6 +1126,19 @@ export async function loadTelegramQuestions(userId, startDate, endDate) {
   }
 }
 
+// Load telegram questions for date range and group by date
+export async function loadTelegramQuestionsByDate(userId, startDate, endDate) {
+  const questions = await loadTelegramQuestions(userId, startDate, endDate);
+  const byDate = {};
+  questions.forEach(q => {
+    if (!byDate[q.date]) {
+      byDate[q.date] = [];
+    }
+    byDate[q.date].push(q);
+  });
+  return byDate;
+}
+
 export async function createTelegramQuestion(userId, data) {
   try {
     const dateStr = typeof data.date === 'string' ? data.date : formatDateISO(data.date);
@@ -602,35 +1255,51 @@ export async function completeOnboarding(userId, examDate, tripStart, tripEnd, s
       tripEnd = '2025-12-29';
     }
 
-    // 1. Create user_settings
+    // 1. Create or update user_settings (upsert to handle re-runs)
     const { error: settingsError } = await supabase
       .from('user_settings')
-      .insert({
+      .upsert({
         user_id: userId,
         exam_date: examDate,
         brazil_trip_start: tripStart,
         brazil_trip_end: tripEnd
+      }, {
+        onConflict: 'user_id'
       });
 
     if (settingsError) throw settingsError;
 
-    // 2. Create modules
-    const modulesWithUserId = selectedModules.map((module, index) => ({
-      user_id: userId,
-      name: module.name,
-      exam_weight: module.exam_weight,
-      subtopics: module.subtopics,
-      completed: 0,
-      color: module.color,
-      subtopics_list: module.subtopics_list,
-      sort_order: index
-    }));
-
-    const { error: modulesError } = await supabase
+    // 2. Check if modules already exist
+    const { data: existingModules, error: checkError } = await supabase
       .from('modules')
-      .insert(modulesWithUserId);
+      .select('id')
+      .eq('user_id', userId)
+      .limit(1);
 
-    if (modulesError) throw modulesError;
+    if (checkError) throw checkError;
+
+    // Only insert modules if they don't exist
+    if (!existingModules || existingModules.length === 0) {
+      const modulesWithUserId = selectedModules.map((module, index) => ({
+        user_id: userId,
+        name: module.name,
+        exam_weight: module.exam_weight,
+        subtopics: module.subtopics,
+        completed: 0,
+        color: module.color,
+        subtopics_list: module.subtopics_list,
+        sort_order: index
+      }));
+
+      const { error: modulesError } = await supabase
+        .from('modules')
+        .insert(modulesWithUserId);
+
+      if (modulesError) throw modulesError;
+      console.log('Created modules');
+    } else {
+      console.log('Modules already exist, skipping creation');
+    }
 
     console.log('Onboarding completed successfully');
     return true;

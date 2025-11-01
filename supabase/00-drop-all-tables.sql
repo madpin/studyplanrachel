@@ -10,8 +10,8 @@
 DROP TRIGGER IF EXISTS update_user_settings_updated_at ON user_settings;
 DROP TRIGGER IF EXISTS update_modules_updated_at ON modules;
 DROP TRIGGER IF EXISTS update_daily_schedule_updated_at ON daily_schedule;
-DROP TRIGGER IF EXISTS update_tasks_updated_at ON tasks;
 DROP TRIGGER IF EXISTS update_task_categories_updated_at ON task_categories;
+DROP TRIGGER IF EXISTS update_tasks_updated_at ON tasks;
 DROP TRIGGER IF EXISTS update_daily_notes_updated_at ON daily_notes;
 DROP TRIGGER IF EXISTS update_sba_tests_updated_at ON sba_tests;
 DROP TRIGGER IF EXISTS update_sba_schedule_updated_at ON sba_schedule;
@@ -35,7 +35,6 @@ DROP TABLE IF EXISTS user_settings CASCADE;
 
 -- Drop custom functions
 DROP FUNCTION IF EXISTS update_updated_at_column() CASCADE;
-DROP FUNCTION IF EXISTS update_daily_schedule_updated_at() CASCADE;
 
 -- Note: Indexes are automatically dropped when tables are dropped
 -- Note: RLS policies are automatically dropped when tables are dropped

@@ -16,6 +16,7 @@ ALTER TABLE sba_tests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sba_schedule ENABLE ROW LEVEL SECURITY;
 ALTER TABLE revision_resources ENABLE ROW LEVEL SECURITY;
 ALTER TABLE catch_up_queue ENABLE ROW LEVEL SECURITY;
+ALTER TABLE telegram_questions ENABLE ROW LEVEL SECURITY;
 
 -- ============================================
 -- RESULT: You should see "Success. No rows returned"

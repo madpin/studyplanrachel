@@ -92,6 +92,7 @@
                 </div>
                 <div class="header-actions">
                     <button onclick="showSettingsModal()" class="btn btn--secondary btn--sm">⚙️ Settings</button>
+                    <button onclick="showOnboardingManually()" class="btn btn--outline btn--sm" title="Re-seed tasks from template">🔄 Re-run Setup</button>
                     <button onclick="handleLogout()" class="btn btn--outline btn--sm">Logout</button>
                 </div>
             </header>
@@ -141,10 +142,13 @@
                 <section id="dailyView" class="view-section active" style="display: none;">
                     <div class="view-header">
                         <h2>Today's Study Plan</h2>
-                        <div class="date-navigator">
-                            <button onclick="changeDay(-1)" class="nav-btn">← Previous</button>
-                            <span id="currentDate" class="current-date">--</span>
-                            <button onclick="changeDay(1)" class="nav-btn">Next →</button>
+                        <div class="daily-view-actions">
+                            <button onclick="showAddTaskModal()" class="btn btn--sm btn--primary">+ Add Task</button>
+                            <div class="date-navigator">
+                                <button onclick="changeDay(-1)" class="nav-btn">← Previous</button>
+                                <span id="currentDate" class="current-date">--</span>
+                                <button onclick="changeDay(1)" class="nav-btn">Next →</button>
+                            </div>
                         </div>
                     </div>
 
@@ -165,8 +169,12 @@
                     </div>
 
                     <div class="notes-section">
-                        <h3>Daily Notes</h3>
+                        <div class="notes-header">
+                            <h3>Daily Notes</h3>
+                            <button id="saveNotesBtn" class="btn btn--sm btn--primary">💾 Save Notes</button>
+                        </div>
                         <textarea id="dailyNotes" placeholder="Add any notes about today's study session..."></textarea>
+                        <div id="notesSaveStatus" class="notes-save-status"></div>
                     </div>
                 </section>
 
@@ -310,14 +318,14 @@
                     <p class="section-description">Choose a pre-defined template or create your own custom schedule.</p>
                     <div class="template-selector">
                         <label class="radio-label">
-                            <input type="radio" name="planTemplate" value="mrcog-jan-2026" id="templateMrcog" checked onchange="handleTemplateChange()">
+                            <input type="radio" name="planTemplate" value="mrcog-jan-2026" id="templateMrcog" checked>
                             <span class="radio-label-content">
                                 <strong>MRCOG Jan 2026 Comprehensive Template</strong><br>
                                 <small>Pre-defined schedule from Nov 1, 2025 to Jan 14, 2026 with daily topics, SBA tests, and revision resources. Fixed dates for optimal planning.</small>
                             </span>
                         </label>
                         <label class="radio-label">
-                            <input type="radio" name="planTemplate" value="custom" id="templateCustom" onchange="handleTemplateChange()">
+                            <input type="radio" name="planTemplate" value="custom" id="templateCustom">
                             <span class="radio-label-content">
                                 <strong>Custom Schedule</strong><br>
                                 <small>Generate a basic schedule based on your selected dates and modules. Flexible dates for personalized planning.</small>
@@ -359,7 +367,12 @@
                 </div>
 
                 <div class="modal-actions">
-                    <button type="submit" class="btn btn--primary btn--large">Start My Study Journey! 🚀</button>
+                    <button type="button" onclick="submitOnboarding(true)" class="btn btn--primary btn--large" id="useTemplateBtn">
+                        📋 Use Template (Recommended)
+                    </button>
+                    <button type="button" onclick="submitOnboarding(false)" class="btn btn--outline btn--large" id="customizeBtn">
+                        ✏️ Customize
+                    </button>
                 </div>
             </form>
         </div>
@@ -458,6 +471,63 @@
                 <div class="modal-actions">
                     <button type="button" onclick="closeTelegramModal()" class="btn btn--outline">Cancel</button>
                     <button type="submit" class="btn btn--primary">Save Question</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Task Modal -->
+    <div id="addTaskModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="taskModalTitle">Add Task</h3>
+                <button onclick="closeTaskModal()" class="modal-close">&times;</button>
+            </div>
+            <form id="taskForm" class="modal-body">
+                <input type="hidden" id="taskEditId">
+                <input type="hidden" id="taskCategoryId">
+                <div class="form-group">
+                    <label class="form-label">Date</label>
+                    <input type="date" id="taskDate" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <select id="taskCategorySelect" class="form-control" required>
+                        <option value="">Select category...</option>
+                        <option value="__new__">+ Create New Category</option>
+                    </select>
+                </div>
+                <div class="form-group" id="newCategoryGroup" style="display: none;">
+                    <label class="form-label">New Category Name</label>
+                    <input type="text" id="newCategoryName" class="form-control" placeholder="e.g., Early Pregnancy">
+                </div>
+                <div class="form-group" id="categoryTimeGroup" style="display: none;">
+                    <label class="form-label">Category Time Estimate</label>
+                    <input type="text" id="newCategoryTime" class="form-control" placeholder="e.g., 2h 30m">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Task Name</label>
+                    <input type="text" id="taskName" class="form-control" required placeholder="e.g., Read GTG 25">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Time Estimate</label>
+                    <input type="text" id="taskTime" class="form-control" required placeholder="e.g., 30 min">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Module (optional)</label>
+                    <select id="taskModule" class="form-control">
+                        <option value="">Select module...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="taskWorkSuitable">
+                        <span>Work Suitable</span>
+                    </label>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" onclick="closeTaskModal()" class="btn btn--outline">Cancel</button>
+                    <button type="submit" class="btn btn--primary">Save Task</button>
                 </div>
             </form>
         </div>

@@ -212,6 +212,26 @@ CREATE POLICY "Users can delete their own catch-up items"
   ON catch_up_queue FOR DELETE
   USING (auth.uid() = user_id);
 
+-- ==========================================
+-- TELEGRAM QUESTIONS POLICIES
+-- ==========================================
+
+CREATE POLICY "Users can view telegram questions"
+  ON telegram_questions FOR SELECT
+  USING (true);
+
+CREATE POLICY "Users can insert their own telegram questions"
+  ON telegram_questions FOR INSERT
+  WITH CHECK (true);
+
+CREATE POLICY "Users can update their own telegram questions"
+  ON telegram_questions FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own telegram questions"
+  ON telegram_questions FOR DELETE
+  USING (auth.uid() = user_id);
+
 -- ============================================
 -- RESULT: You should see "Success. No rows returned"
 -- NEXT: Configure your app in config.js and test!

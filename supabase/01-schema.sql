@@ -36,13 +36,14 @@ CREATE TABLE modules (
 );
 
 -- Daily Schedule Table
+-- Stores day-by-day schedule with topics, type, and resources
 CREATE TABLE daily_schedule (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   date DATE NOT NULL,
-  topics JSONB NOT NULL DEFAULT '[]',
-  day_type TEXT NOT NULL,
-  resources JSONB NOT NULL DEFAULT '[]',
+  topics TEXT[] NOT NULL DEFAULT '{}',
+  type TEXT NOT NULL DEFAULT 'off',
+  resources TEXT[] NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, date)
@@ -188,10 +189,25 @@ CREATE TRIGGER update_modules_updated_at BEFORE UPDATE ON modules
 CREATE TRIGGER update_daily_schedule_updated_at BEFORE UPDATE ON daily_schedule
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_task_categories_updated_at BEFORE UPDATE ON task_categories
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 CREATE TRIGGER update_tasks_updated_at BEFORE UPDATE ON tasks
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_daily_notes_updated_at BEFORE UPDATE ON daily_notes
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_sba_tests_updated_at BEFORE UPDATE ON sba_tests
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_sba_schedule_updated_at BEFORE UPDATE ON sba_schedule
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_revision_resources_updated_at BEFORE UPDATE ON revision_resources
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_catch_up_queue_updated_at BEFORE UPDATE ON catch_up_queue
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_telegram_questions_updated_at BEFORE UPDATE ON telegram_questions

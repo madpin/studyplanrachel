@@ -37,6 +37,7 @@ import {
 } from './schedule.js';
 import {
   loadTasksForDate,
+  loadTasksForDateRange,
   toggleTaskCompletion,
   saveDailyNote,
   updateDayScheduleType,
@@ -44,6 +45,7 @@ import {
   getModuleProgressStats,
   loadSBATests,
   loadSBASchedule,
+  loadSBAScheduleByDate,
   toggleSBAScheduleCompletion,
   deleteSBAScheduleEntry,
   createSBATest,
@@ -51,6 +53,7 @@ import {
   deleteSBATest,
   createSBAScheduleEntry,
   loadTelegramQuestions,
+  loadTelegramQuestionsByDate,
   toggleTelegramQuestionCompletion,
   deleteTelegramQuestion,
   createTelegramQuestion,
@@ -58,7 +61,11 @@ import {
   bulkUploadSBA,
   bulkUploadTelegramQuestions,
   createPlaceholders,
-  updateSBATestProgress
+  updateSBATestProgress,
+  createTask,
+  updateTask,
+  deleteTask,
+  createTaskCategory
 } from './storage.js';
 import {
   calculateOverallProgress,
@@ -66,6 +73,17 @@ import {
   updateSBAHeaderStats,
   updateTelegramHeaderStats
 } from './progress.js';
+import {
+  showSuccess,
+  showError,
+  showWarning,
+  showInfo,
+  showConfirm
+} from './toast.js';
+import {
+  validateSBABulkUpload,
+  validateTelegramBulkUpload
+} from './validation.js';
 
 // ==========================================================
 // HELPER FUNCTIONS
@@ -73,6 +91,44 @@ import {
 
 export function showLoading(show) {
   document.getElementById('loadingIndicator').style.display = show ? 'flex' : 'none';
+}
+
+// Calculate total time for a day from categories
+function calculateTotalTimeForDay(categories) {
+  let totalMinutes = 0;
+  categories.forEach(cat => {
+    const catTime = parseTimeEstimate(cat.time_estimate);
+    totalMinutes += catTime;
+  });
+  return totalMinutes;
+}
+
+// Parse time estimate string to minutes
+function parseTimeEstimate(timeStr) {
+  if (!timeStr) return 0;
+  
+  let minutes = 0;
+  const hourMatch = timeStr.match(/(\d+)\s*h/i);
+  const minMatch = timeStr.match(/(\d+)\s*m/i);
+  
+  if (hourMatch) minutes += parseInt(hourMatch[1]) * 60;
+  if (minMatch) minutes += parseInt(minMatch[1]);
+  
+  return minutes;
+}
+
+// Format minutes to hours and minutes display
+function formatMinutesToHours(minutes) {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  
+  if (hours > 0 && mins > 0) {
+    return `${hours}h ${mins}m`;
+  } else if (hours > 0) {
+    return `${hours}h`;
+  } else {
+    return `${mins}m`;
+  }
 }
 
 // Update header stats
@@ -217,6 +273,7 @@ export function renderDailyView() {
     // Set badge based on day type
     const badgeClasses = {
       'work': 'day-type-badge work-day clickable',
+      'off': 'day-type-badge light-day clickable',
       'revision': 'day-type-badge revision-day clickable',
       'trip': 'day-type-badge brazil-trip clickable',
       'trip-end': 'day-type-badge brazil-trip clickable',
@@ -229,6 +286,7 @@ export function renderDailyView() {
     
     const badgeLabels = {
       'work': 'Work Day',
+      'off': 'Off Day',
       'revision': 'Revision Day',
       'trip': 'Brazil Trip',
       'trip-end': 'Brazil Trip',
@@ -259,8 +317,13 @@ export function renderDailyView() {
   console.log('[renderDailyView] Tasks:', categories);
   console.log('[renderDailyView] SBA:', sbaEntries);
   console.log('[renderDailyView] Telegram:', telegramQuestions);
+  
+  // Calculate total time for the day
+  const totalMinutes = calculateTotalTimeForDay(categories);
+  const timeDisplay = totalMinutes > 0 ? 
+    `<div class="daily-time-total">⏱ Total time today: ${formatMinutesToHours(totalMinutes)}</div>` : '';
 
-  let html = '';
+  let html = timeDisplay;
 
   // Render task categories
   if (categories.length > 0) {
@@ -291,6 +354,8 @@ export function renderDailyView() {
                   <div class="task-meta">
                     <span>⏱ ${task.time_estimate}</span>
                     ${task.work_suitable ? '<span class="task-badge work-suitable">✓ Work Suitable</span>' : ''}
+                    <button class="btn btn--sm btn--secondary" onclick="window.editTask('${task.id}')">Edit</button>
+                    <button class="btn btn--sm btn--outline" onclick="window.deleteTaskConfirm('${task.id}')">Delete</button>
                   </div>
                 </div>
               </li>
@@ -522,56 +587,38 @@ export async function renderWeeklyView() {
   document.getElementById('currentWeek').textContent =
     `${formatDateShort(weekStart)} - ${formatDateShort(weekEnd)}`;
 
-  // Load data for all days in the week
-  const weekData = await Promise.all(weekDays.map(async day => {
-    const dateStr = formatDateISO(day);
-    const currentUser = getCurrentUser();
-    
-    // Load tasks
-    const { data: categories } = await supabase
-      .from('task_categories')
-      .select('*, tasks(*)')
-      .eq('user_id', currentUser.id)
-      .eq('date', dateStr);
-    
-    // Load SBA schedule
-    const { data: sbaEntries } = await supabase
-      .from('sba_schedule')
-      .select('*')
-      .eq('user_id', currentUser.id)
-      .eq('date', dateStr);
-    
-    // Load telegram questions
-    const { data: telegramQuestions } = await supabase
-      .from('telegram_questions')
-      .select('*')
-      .eq('user_id', currentUser.id)
-      .eq('date', dateStr);
-    
-    return {
-      date: day,
-      dateStr,
-      categories: categories || [],
-      sbaEntries: sbaEntries || [],
-      telegramQuestions: telegramQuestions || []
-    };
-  }));
+  // Load data for entire week with 3 queries instead of 21 (7 days × 3 queries)
+  const currentUser = getCurrentUser();
+  const startStr = formatDateISO(weekStart);
+  const endStr = formatDateISO(weekEnd);
+  
+  const [tasksByDate, sbaByDate, telegramByDate] = await Promise.all([
+    loadTasksForDateRange(currentUser.id, startStr, endStr),
+    loadSBAScheduleByDate(currentUser.id, startStr, endStr),
+    loadTelegramQuestionsByDate(currentUser.id, startStr, endStr)
+  ]);
 
   const weeklyContent = document.getElementById('weeklyContent');
-  weeklyContent.innerHTML = weekData.map(dayData => {
-    const dayName = dayData.date.toLocaleDateString('en-GB', { weekday: 'long' });
-    const totalTasks = dayData.categories.reduce((sum, cat) => sum + cat.tasks.length, 0);
-    const completedTasks = dayData.categories.reduce((sum, cat) => 
+  weeklyContent.innerHTML = weekDays.map(day => {
+    const dateStr = formatDateISO(day);
+    const dayName = day.toLocaleDateString('en-GB', { weekday: 'long' });
+    
+    const categories = tasksByDate[dateStr] || [];
+    const sbaEntries = sbaByDate[dateStr] || [];
+    const telegramQuestions = telegramByDate[dateStr] || [];
+    
+    const totalTasks = categories.reduce((sum, cat) => sum + cat.tasks.length, 0);
+    const completedTasks = categories.reduce((sum, cat) => 
       sum + cat.tasks.filter(t => t.completed).length, 0);
-    const sbaCount = dayData.sbaEntries.length;
-    const completedSBA = dayData.sbaEntries.filter(s => s.completed).length;
-    const telegramCount = dayData.telegramQuestions.length;
-    const completedTelegram = dayData.telegramQuestions.filter(q => q.completed).length;
+    const sbaCount = sbaEntries.length;
+    const completedSBA = sbaEntries.filter(s => s.completed).length;
+    const telegramCount = telegramQuestions.length;
+    const completedTelegram = telegramQuestions.filter(q => q.completed).length;
 
     return `
-      <div class="week-day-card" onclick="window.viewDayFromWeek('${dayData.dateStr}')">
+      <div class="week-day-card" onclick="window.viewDayFromWeek('${dateStr}')">
         <div class="week-day-header">${dayName}</div>
-        <div class="week-day-date">${formatDateShort(dayData.date)}</div>
+        <div class="week-day-date">${formatDateShort(day)}</div>
         <div class="week-day-info">
           ${totalTasks > 0 ? `
             <div class="week-item">
@@ -626,55 +673,16 @@ export async function renderCalendarView() {
   const startDay = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
   const daysInMonth = lastDay.getDate();
 
-  // Load data for all days in the month
-  const monthDates = [];
-  for (let day = 1; day <= daysInMonth; day++) {
-    monthDates.push(new Date(year, month, day));
-  }
-
+  // Load data for entire month with 3 queries instead of ~90 (30 days × 3 queries)
   const currentUser = getCurrentUser();
-  const monthData = await Promise.all(monthDates.map(async date => {
-    const dateStr = formatDateISO(date);
-    
-    // Load tasks
-    const { data: categories } = await supabase
-      .from('task_categories')
-      .select('*, tasks(*)')
-      .eq('user_id', currentUser.id)
-      .eq('date', dateStr);
-    
-    // Load SBA schedule
-    const { data: sbaEntries } = await supabase
-      .from('sba_schedule')
-      .select('*')
-      .eq('user_id', currentUser.id)
-      .eq('date', dateStr);
-    
-    // Load telegram questions
-    const { data: telegramQuestions } = await supabase
-      .from('telegram_questions')
-      .select('*')
-      .eq('user_id', currentUser.id)
-      .eq('date', dateStr);
-    
-    const totalTasks = (categories || []).reduce((sum, cat) => sum + cat.tasks.length, 0);
-    const completedTasks = (categories || []).reduce((sum, cat) => 
-      sum + cat.tasks.filter(t => t.completed).length, 0);
-    const sbaCount = (sbaEntries || []).length;
-    const completedSBA = (sbaEntries || []).filter(s => s.completed).length;
-    const telegramCount = (telegramQuestions || []).length;
-    const completedTelegram = (telegramQuestions || []).filter(q => q.completed).length;
-    
-    return {
-      dateStr,
-      totalTasks,
-      completedTasks,
-      sbaCount,
-      completedSBA,
-      telegramCount,
-      completedTelegram
-    };
-  }));
+  const startStr = formatDateISO(firstDay);
+  const endStr = formatDateISO(lastDay);
+  
+  const [tasksByDate, sbaByDate, telegramByDate] = await Promise.all([
+    loadTasksForDateRange(currentUser.id, startStr, endStr),
+    loadSBAScheduleByDate(currentUser.id, startStr, endStr),
+    loadTelegramQuestionsByDate(currentUser.id, startStr, endStr)
+  ]);
 
   const calendarContent = document.getElementById('calendarContent');
   let html = '';
@@ -694,23 +702,35 @@ export async function renderCalendarView() {
   const today = new Date();
   for (let day = 1; day <= daysInMonth; day++) {
     const date = new Date(year, month, day);
-    const dayData = monthData[day - 1];
+    const dateStr = formatDateISO(date);
     let dayClass = 'calendar-day';
 
     if (date.toDateString() === today.toDateString()) {
       dayClass += ' today';
     }
 
-    const hasItems = dayData.totalTasks > 0 || dayData.sbaCount > 0 || dayData.telegramCount > 0;
+    const categories = tasksByDate[dateStr] || [];
+    const sbaEntries = sbaByDate[dateStr] || [];
+    const telegramQuestions = telegramByDate[dateStr] || [];
+    
+    const totalTasks = categories.reduce((sum, cat) => sum + cat.tasks.length, 0);
+    const completedTasks = categories.reduce((sum, cat) => 
+      sum + cat.tasks.filter(t => t.completed).length, 0);
+    const sbaCount = sbaEntries.length;
+    const completedSBA = sbaEntries.filter(s => s.completed).length;
+    const telegramCount = telegramQuestions.length;
+    const completedTelegram = telegramQuestions.filter(q => q.completed).length;
+
+    const hasItems = totalTasks > 0 || sbaCount > 0 || telegramCount > 0;
 
     html += `
-      <div class="${dayClass} ${hasItems ? 'has-items' : ''}" onclick="window.viewDayFromCalendar('${formatDateISO(date)}')">
+      <div class="${dayClass} ${hasItems ? 'has-items' : ''}" onclick="window.viewDayFromCalendar('${dateStr}')">
         <div class="calendar-day-number">${day}</div>
         ${hasItems ? `
           <div class="calendar-day-items">
-            ${dayData.totalTasks > 0 ? `<div class="calendar-indicator">📚 ${dayData.completedTasks}/${dayData.totalTasks}</div>` : ''}
-            ${dayData.sbaCount > 0 ? `<div class="calendar-indicator">📋 ${dayData.completedSBA}/${dayData.sbaCount}</div>` : ''}
-            ${dayData.telegramCount > 0 ? `<div class="calendar-indicator">💬 ${dayData.completedTelegram}/${dayData.telegramCount}</div>` : ''}
+            ${totalTasks > 0 ? `<div class="calendar-indicator">📚 ${completedTasks}/${totalTasks}</div>` : ''}
+            ${sbaCount > 0 ? `<div class="calendar-indicator">📋 ${completedSBA}/${sbaCount}</div>` : ''}
+            ${telegramCount > 0 ? `<div class="calendar-indicator">💬 ${completedTelegram}/${telegramCount}</div>` : ''}
           </div>
         ` : ''}
       </div>
@@ -784,26 +804,38 @@ export async function renderModulesView() {
 // ==========================================================
 
 export async function renderSBAView() {
-  // This is a placeholder - the full SBA view would be much longer
-  // In the actual implementation, this would include full SBA test management
   const sbaTestsList = document.getElementById('sbaTestsList');
   const currentUser = getCurrentUser();
   const tests = await loadSBATests(currentUser.id);
   
   if (tests.length === 0) {
-    sbaTestsList.innerHTML = '<p class="empty-state">No SBA tests defined yet.</p>';
+    sbaTestsList.innerHTML = `
+      <div class="empty-state">
+        <p>No SBA tests defined yet.</p>
+        <button onclick="window.showAddSBAModal()" class="btn btn--primary">+ Add Your First SBA Test</button>
+      </div>
+    `;
   } else {
     sbaTestsList.innerHTML = tests.map(test => `
       <div class="sba-test-card">
         <div class="sba-test-header">
           <div class="sba-test-name">${test.name}</div>
+          <div class="sba-test-actions">
+            <button class="btn btn--sm btn--secondary" onclick="window.editSBATest('${test.id}')">Edit</button>
+            <button class="btn btn--sm btn--outline" onclick="window.deleteSBATestConfirm('${test.id}')">Delete</button>
+          </div>
+        </div>
+        <div class="sba-test-meta">
+          <span>📊 ${test.total_days} days</span>
+          <span>⏱ ${test.avg_time}/day</span>
+          <span>📖 ${test.reading_time} reading</span>
         </div>
         <div class="sba-test-progress">
           <div class="progress-bar-container">
             <div class="progress-bar" style="width: ${Math.round((test.completed / test.total_days) * 100)}%;"></div>
           </div>
           <div class="progress-text">
-            <span>${test.completed}/${test.total_days} completed</span>
+            <span>${test.completed}/${test.total_days} completed (${Math.round((test.completed / test.total_days) * 100)}%)</span>
           </div>
         </div>
       </div>
@@ -813,15 +845,666 @@ export async function renderSBAView() {
   await updateSBAHeaderStatsHandler();
 }
 
+// Show Add SBA Modal
+export function showAddSBAModal() {
+  const modal = document.getElementById('addSBAModal');
+  document.getElementById('sbaModalTitle').textContent = 'Add SBA Test';
+  document.getElementById('sbaEditId').value = '';
+  document.getElementById('sbaTestKey').value = '';
+  document.getElementById('sbaName').value = '';
+  document.getElementById('sbaTotalDays').value = '';
+  document.getElementById('sbaReadingTime').value = '';
+  document.getElementById('sbaAvgTime').value = '';
+  
+  // Enable test key field for new tests
+  document.getElementById('sbaTestKey').disabled = false;
+  
+  modal.style.display = 'flex';
+  
+  // Setup form submission if not already set
+  const form = document.getElementById('sbaForm');
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    await saveSBATest();
+  };
+}
+
+// Close SBA Modal
+export function closeSBAModal() {
+  document.getElementById('addSBAModal').style.display = 'none';
+}
+
+// Save SBA Test (create or update)
+export async function saveSBATest() {
+  const editId = document.getElementById('sbaEditId').value;
+  const testKey = document.getElementById('sbaTestKey').value.trim();
+  const name = document.getElementById('sbaName').value.trim();
+  const totalDays = parseInt(document.getElementById('sbaTotalDays').value);
+  const readingTime = document.getElementById('sbaReadingTime').value.trim();
+  const avgTime = document.getElementById('sbaAvgTime').value.trim();
+  
+  // Validation
+  if (!testKey || !name || !totalDays || !readingTime || !avgTime) {
+    showError('All fields are required');
+    return;
+  }
+  
+  if (totalDays <= 0) {
+    showError('Total days must be greater than 0');
+    return;
+  }
+  
+  const currentUser = getCurrentUser();
+  
+  try {
+    showLoading(true);
+    
+    if (editId) {
+      // Update existing test
+      await updateSBATest(editId, {
+        name,
+        total_days: totalDays,
+        reading_time: readingTime,
+        avg_time: avgTime
+      });
+      showSuccess('SBA test updated successfully!');
+    } else {
+      // Create new test
+      await createSBATest(currentUser.id, {
+        test_key: testKey,
+        name,
+        total_days: totalDays,
+        reading_time: readingTime,
+        avg_time: avgTime
+      });
+      showSuccess('SBA test added successfully!');
+    }
+    
+    closeSBAModal();
+    await renderSBAView();
+    showLoading(false);
+  } catch (error) {
+    console.error('Error saving SBA test:', error);
+    showError('Failed to save SBA test: ' + error.message);
+    showLoading(false);
+  }
+}
+
+// Edit SBA Test
+export async function editSBATest(testId) {
+  const currentUser = getCurrentUser();
+  const tests = await loadSBATests(currentUser.id);
+  const test = tests.find(t => t.id === testId);
+  
+  if (!test) {
+    showError('Test not found');
+    return;
+  }
+  
+  const modal = document.getElementById('addSBAModal');
+  document.getElementById('sbaModalTitle').textContent = 'Edit SBA Test';
+  document.getElementById('sbaEditId').value = test.id;
+  document.getElementById('sbaTestKey').value = test.test_key;
+  document.getElementById('sbaName').value = test.name;
+  document.getElementById('sbaTotalDays').value = test.total_days;
+  document.getElementById('sbaReadingTime').value = test.reading_time;
+  document.getElementById('sbaAvgTime').value = test.avg_time;
+  
+  // Disable test key field when editing
+  document.getElementById('sbaTestKey').disabled = true;
+  
+  modal.style.display = 'flex';
+  
+  // Setup form submission if not already set
+  const form = document.getElementById('sbaForm');
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    await saveSBATest();
+  };
+}
+
+// Delete SBA Test with confirmation
+export async function deleteSBATestConfirm(testId) {
+  showConfirm('Are you sure you want to delete this SBA test? This will not delete associated schedule entries.', async () => {
+    try {
+      showLoading(true);
+      await deleteSBATest(testId);
+      await renderSBAView();
+      showSuccess('SBA test deleted successfully!');
+      showLoading(false);
+    } catch (error) {
+      showError('Failed to delete SBA test: ' + error.message);
+      showLoading(false);
+    }
+  });
+}
+
+// Show SBA Bulk Upload Modal
+export function showSBABulkUploadModal() {
+  const modal = document.getElementById('bulkUploadModal');
+  document.getElementById('bulkUploadTitle').textContent = 'SBA Bulk Upload';
+  document.getElementById('bulkUploadType').value = 'sba';
+  document.getElementById('bulkUploadJSON').value = '';
+  document.getElementById('bulkUploadResult').innerHTML = '';
+  
+  modal.style.display = 'flex';
+  
+  // Setup process button
+  const processBtn = modal.querySelector('button[onclick="processBulkUpload()"]');
+  if (processBtn) {
+    processBtn.onclick = () => processSBABulkUpload();
+  }
+}
+
+// Process SBA Bulk Upload
+async function processSBABulkUpload() {
+  const jsonText = document.getElementById('bulkUploadJSON').value.trim();
+  const resultDiv = document.getElementById('bulkUploadResult');
+  
+  if (!jsonText) {
+    showError('Please enter JSON data');
+    return;
+  }
+  
+  try {
+    const jsonData = JSON.parse(jsonText);
+    const validation = validateSBABulkUpload(jsonData);
+    
+    // Show preview
+    resultDiv.innerHTML = `
+      <div class="bulk-upload-summary ${validation.valid ? 'success' : 'error'}">
+        <h4>Validation Results</h4>
+        <p><strong>Total:</strong> ${validation.summary.total} entries</p>
+        <p><strong>✓ Valid:</strong> ${validation.summary.valid}</p>
+        <p><strong>✗ Errors:</strong> ${validation.summary.errors}</p>
+      </div>
+      ${validation.preview.length > 0 ? `
+        <div class="bulk-upload-preview">
+          <table style="width: 100%; border-collapse: collapse; margin-top: 16px;">
+            <thead>
+              <tr style="background: #f5f5f5;">
+                <th style="padding: 8px; text-align: left;">Row</th>
+                <th style="padding: 8px; text-align: left;">Date</th>
+                <th style="padding: 8px; text-align: left;">SBA Name</th>
+                <th style="padding: 8px; text-align: left;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${validation.preview.map(row => `
+                <tr style="border-bottom: 1px solid #eee; ${row.valid ? '' : 'background: #fff3f3;'}">
+                  <td style="padding: 8px;">${row.rowNum}</td>
+                  <td style="padding: 8px;">${row.data.date || '—'}</td>
+                  <td style="padding: 8px;">${row.data.sba_name || '—'}</td>
+                  <td style="padding: 8px;">
+                    ${row.valid ? 
+                      '<span style="color: green;">✓</span>' : 
+                      `<span style="color: red;">✗ ${row.errors.join(', ')}</span>`
+                    }
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : ''}
+    `;
+    
+    if (!validation.valid) {
+      showError('Please fix validation errors before uploading');
+      return;
+    }
+    
+    // Confirm upload
+    const confirmed = await new Promise(resolve => {
+      showConfirm(`Upload ${validation.summary.valid} SBA schedule entries?`, () => resolve(true));
+      // If they cancel, resolve to false after 100ms
+      setTimeout(() => resolve(false), 100);
+    });
+    
+    if (!confirmed) return;
+    
+    // Perform upload
+    showLoading(true);
+    const currentUser = getCurrentUser();
+    await bulkUploadSBA(currentUser.id, jsonData);
+    
+    closeBulkUploadModal();
+    showSuccess(`Successfully uploaded ${validation.summary.valid} SBA entries!`);
+    showLoading(false);
+    
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      showError('Invalid JSON format: ' + error.message);
+      resultDiv.innerHTML = `<div class="bulk-upload-summary error"><p>Invalid JSON: ${error.message}</p></div>`;
+    } else {
+      console.error('Error processing bulk upload:', error);
+      showError('Failed to upload: ' + error.message);
+    }
+    showLoading(false);
+  }
+}
+
+// Close Bulk Upload Modal
+function closeBulkUploadModal() {
+  document.getElementById('bulkUploadModal').style.display = 'none';
+}
+
+// Show Telegram Bulk Upload Modal (wire it up)
+export function showTelegramBulkUploadModal() {
+  const modal = document.getElementById('bulkUploadModal');
+  document.getElementById('bulkUploadTitle').textContent = 'Telegram Bulk Upload';
+  document.getElementById('bulkUploadType').value = 'telegram';
+  document.getElementById('bulkUploadJSON').value = '';
+  document.getElementById('bulkUploadResult').innerHTML = '';
+  
+  modal.style.display = 'flex';
+  
+  // Setup process button
+  const processBtn = modal.querySelector('button[onclick="processBulkUpload()"]');
+  if (processBtn) {
+    processBtn.onclick = () => processTelegramBulkUpload();
+  }
+}
+
+// Process Telegram Bulk Upload
+async function processTelegramBulkUpload() {
+  const jsonText = document.getElementById('bulkUploadJSON').value.trim();
+  const resultDiv = document.getElementById('bulkUploadResult');
+  
+  if (!jsonText) {
+    showError('Please enter JSON data');
+    return;
+  }
+  
+  try {
+    const jsonData = JSON.parse(jsonText);
+    const validation = validateTelegramBulkUpload(jsonData);
+    
+    // Show preview
+    resultDiv.innerHTML = `
+      <div class="bulk-upload-summary ${validation.valid ? 'success' : 'error'}">
+        <h4>Validation Results</h4>
+        <p><strong>Total:</strong> ${validation.summary.total} entries</p>
+        <p><strong>✓ Valid:</strong> ${validation.summary.valid}</p>
+        <p><strong>✗ Errors:</strong> ${validation.summary.errors}</p>
+      </div>
+      ${validation.preview.length > 0 ? `
+        <div class="bulk-upload-preview">
+          <table style="width: 100%; border-collapse: collapse; margin-top: 16px;">
+            <thead>
+              <tr style="background: #f5f5f5;">
+                <th style="padding: 8px; text-align: left;">Row</th>
+                <th style="padding: 8px; text-align: left;">Date</th>
+                <th style="padding: 8px; text-align: left;">Question</th>
+                <th style="padding: 8px; text-align: left;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${validation.preview.map(row => `
+                <tr style="border-bottom: 1px solid #eee; ${row.valid ? '' : 'background: #fff3f3;'}">
+                  <td style="padding: 8px;">${row.rowNum}</td>
+                  <td style="padding: 8px;">${row.data.date || '—'}</td>
+                  <td style="padding: 8px;">${row.data.question_text ? row.data.question_text.substring(0, 50) + '...' : '—'}</td>
+                  <td style="padding: 8px;">
+                    ${row.valid ? 
+                      '<span style="color: green;">✓</span>' : 
+                      `<span style="color: red;">✗ ${row.errors.join(', ')}</span>`
+                    }
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : ''}
+    `;
+    
+    if (!validation.valid) {
+      showError('Please fix validation errors before uploading');
+      return;
+    }
+    
+    // Confirm upload
+    const confirmed = await new Promise(resolve => {
+      showConfirm(`Upload ${validation.summary.valid} telegram questions?`, () => resolve(true));
+      setTimeout(() => resolve(false), 100);
+    });
+    
+    if (!confirmed) return;
+    
+    // Perform upload
+    showLoading(true);
+    const currentUser = getCurrentUser();
+    await bulkUploadTelegramQuestions(currentUser.id, jsonData);
+    
+    closeBulkUploadModal();
+    showSuccess(`Successfully uploaded ${validation.summary.valid} telegram questions!`);
+    showLoading(false);
+    
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      showError('Invalid JSON format: ' + error.message);
+      resultDiv.innerHTML = `<div class="bulk-upload-summary error"><p>Invalid JSON: ${error.message}</p></div>`;
+    } else {
+      console.error('Error processing bulk upload:', error);
+      showError('Failed to upload: ' + error.message);
+    }
+    showLoading(false);
+  }
+}
+
+// Show SBA Placeholder Modal
+export function showSBAPlaceholderModal() {
+  showInfo('SBA placeholder creation feature coming soon!');
+  // This will be implemented later
+}
+
+// Load SBA Schedule View
+export async function loadSBAScheduleView() {
+  const startDateInput = document.getElementById('sbaScheduleStartDate');
+  const endDateInput = document.getElementById('sbaScheduleEndDate');
+  
+  if (!startDateInput.value || !endDateInput.value) {
+    showWarning('Please select both start and end dates');
+    return;
+  }
+  
+  const currentUser = getCurrentUser();
+  const schedule = await loadSBASchedule(currentUser.id, startDateInput.value, endDateInput.value);
+  
+  const contentEl = document.getElementById('sbaScheduleContent');
+  
+  if (schedule.length === 0) {
+    contentEl.innerHTML = '<p class="empty-state">No SBA schedule entries for the selected date range.</p>';
+    return;
+  }
+  
+  // Group by date
+  const byDate = {};
+  schedule.forEach(entry => {
+    if (!byDate[entry.date]) {
+      byDate[entry.date] = [];
+    }
+    byDate[entry.date].push(entry);
+  });
+  
+  contentEl.innerHTML = Object.keys(byDate).sort().map(date => {
+    const entries = byDate[date];
+    return `
+      <div class="sba-schedule-day">
+        <div class="sba-schedule-date">${new Date(date).toLocaleDateString('en-GB', { 
+          weekday: 'short', 
+          day: 'numeric', 
+          month: 'short', 
+          year: 'numeric' 
+        })}</div>
+        <div class="sba-schedule-entries">
+          ${entries.map(entry => `
+            <div class="sba-schedule-entry ${entry.completed ? 'completed' : ''}">
+              <input
+                type="checkbox"
+                ${entry.completed ? 'checked' : ''}
+                onchange="window.handleSBAScheduleToggle('${entry.id}')"
+              />
+              <span class="sba-schedule-name">${entry.sba_name}</span>
+              ${entry.is_placeholder ? '<span class="placeholder-badge">Placeholder</span>' : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
 // ==========================================================
 // TELEGRAM VIEW (simplified)
 // ==========================================================
 
 export async function renderTelegramView() {
-  // Simplified placeholder
   const contentEl = document.getElementById('telegramQuestionsContent');
-  contentEl.innerHTML = '<p>Telegram questions view</p>';
+  contentEl.innerHTML = `
+    <div class="empty-state">
+      <p>Click "Filter" to load telegram questions, or add your first question.</p>
+      <button onclick="window.showAddTelegramModal()" class="btn btn--primary">+ Add Telegram Question</button>
+    </div>
+  `;
   await updateTelegramHeaderStatsHandler();
+}
+
+// Show Add Telegram Modal
+export function showAddTelegramModal() {
+  const modal = document.getElementById('addTelegramModal');
+  const today = new Date().toISOString().split('T')[0];
+  
+  document.getElementById('telegramModalTitle').textContent = 'Add Telegram Question';
+  document.getElementById('telegramEditId').value = '';
+  document.getElementById('telegramQuestionDate').value = today;
+  document.getElementById('telegramQuestionText').value = '';
+  document.getElementById('telegramQuestionSource').value = '';
+  
+  modal.style.display = 'flex';
+  
+  // Setup form submission if not already set
+  const form = document.getElementById('telegramForm');
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    await saveTelegramQuestion();
+  };
+}
+
+// Close Telegram Modal
+export function closeTelegramModal() {
+  document.getElementById('addTelegramModal').style.display = 'none';
+}
+
+// Save Telegram Question (create or update)
+export async function saveTelegramQuestion() {
+  const editId = document.getElementById('telegramEditId').value;
+  const date = document.getElementById('telegramQuestionDate').value;
+  const questionText = document.getElementById('telegramQuestionText').value.trim();
+  const source = document.getElementById('telegramQuestionSource').value.trim();
+  
+  // Validation
+  if (!date || !questionText) {
+    showError('Date and question text are required');
+    return;
+  }
+  
+  const currentUser = getCurrentUser();
+  
+  try {
+    showLoading(true);
+    
+    if (editId) {
+      // Update existing question
+      await updateTelegramQuestion(editId, {
+        date,
+        question_text: questionText,
+        source: source || null
+      });
+      showSuccess('Telegram question updated successfully!');
+    } else {
+      // Create new question
+      await createTelegramQuestion(currentUser.id, {
+        date,
+        question_text: questionText,
+        source: source || null
+      });
+      showSuccess('Telegram question added successfully!');
+    }
+    
+    closeTelegramModal();
+    
+    // Reload the telegram view with current filters
+    const startDate = document.getElementById('telegramStartDate').value;
+    const endDate = document.getElementById('telegramEndDate').value;
+    if (startDate && endDate) {
+      await loadTelegramQuestionsView();
+    }
+    
+    // If we're in daily view and the question was for viewing date, reload
+    const viewingDate = getViewingDate();
+    const dateStr = formatDateISO(viewingDate);
+    if (date === dateStr) {
+      await loadTasksForDateHandler(viewingDate);
+      renderDailyView();
+    }
+    
+    await updateTelegramHeaderStatsHandler();
+    showLoading(false);
+  } catch (error) {
+    console.error('Error saving telegram question:', error);
+    showError('Failed to save telegram question: ' + error.message);
+    showLoading(false);
+  }
+}
+
+// Edit Telegram Question
+export async function editTelegramQuestion(questionId) {
+  const currentUser = getCurrentUser();
+  
+  try {
+    // Load question data - we'll need to search across dates
+    const { data: question, error } = await supabase
+      .from('telegram_questions')
+      .select('*')
+      .eq('id', questionId)
+      .single();
+    
+    if (error) throw error;
+    
+    if (!question) {
+      showError('Question not found');
+      return;
+    }
+    
+    const modal = document.getElementById('addTelegramModal');
+    document.getElementById('telegramModalTitle').textContent = 'Edit Telegram Question';
+    document.getElementById('telegramEditId').value = question.id;
+    document.getElementById('telegramQuestionDate').value = question.date;
+    document.getElementById('telegramQuestionText').value = question.question_text;
+    document.getElementById('telegramQuestionSource').value = question.source || '';
+    
+    modal.style.display = 'flex';
+    
+    // Setup form submission if not already set
+    const form = document.getElementById('telegramForm');
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      await saveTelegramQuestion();
+    };
+  } catch (error) {
+    console.error('Error loading telegram question:', error);
+    showError('Failed to load telegram question: ' + error.message);
+  }
+}
+
+// Load Telegram Questions View with filters
+export async function loadTelegramQuestionsView() {
+  const startDateInput = document.getElementById('telegramStartDate');
+  const endDateInput = document.getElementById('telegramEndDate');
+  const sourceFilter = document.getElementById('telegramSourceFilter').value;
+  const statusFilter = document.getElementById('telegramStatusFilter').value;
+  
+  if (!startDateInput.value || !endDateInput.value) {
+    showWarning('Please select both start and end dates');
+    return;
+  }
+  
+  const currentUser = getCurrentUser();
+  
+  try {
+    showLoading(true);
+    
+    // Load all questions in the date range
+    let questions = await loadTelegramQuestions(currentUser.id, startDateInput.value, endDateInput.value);
+    
+    // Apply filters
+    if (sourceFilter) {
+      questions = questions.filter(q => q.source === sourceFilter);
+    }
+    
+    if (statusFilter) {
+      if (statusFilter === 'completed') {
+        questions = questions.filter(q => q.completed);
+      } else if (statusFilter === 'pending') {
+        questions = questions.filter(q => !q.completed);
+      }
+    }
+    
+    const contentEl = document.getElementById('telegramQuestionsContent');
+    
+    if (questions.length === 0) {
+      contentEl.innerHTML = `
+        <div class="empty-state">
+          <p>No telegram questions found for the selected filters.</p>
+          <button onclick="window.showAddTelegramModal()" class="btn btn--primary">+ Add Telegram Question</button>
+        </div>
+      `;
+      showLoading(false);
+      return;
+    }
+    
+    // Group by date
+    const byDate = {};
+    questions.forEach(q => {
+      if (!byDate[q.date]) {
+        byDate[q.date] = [];
+      }
+      byDate[q.date].push(q);
+    });
+    
+    contentEl.innerHTML = `
+      <div class="telegram-results-header">
+        <h3>Found ${questions.length} question${questions.length !== 1 ? 's' : ''}</h3>
+        <div class="telegram-stats">
+          <span>✅ ${questions.filter(q => q.completed).length} completed</span>
+          <span>⏳ ${questions.filter(q => !q.completed).length} pending</span>
+        </div>
+      </div>
+      ${Object.keys(byDate).sort().map(date => {
+        const dateQuestions = byDate[date];
+        return `
+          <div class="telegram-day-group">
+            <div class="telegram-day-header">${new Date(date).toLocaleDateString('en-GB', { 
+              weekday: 'long', 
+              day: 'numeric', 
+              month: 'long', 
+              year: 'numeric' 
+            })}</div>
+            <div class="telegram-questions-list">
+              ${dateQuestions.map(q => `
+                <div class="telegram-question-card ${q.completed ? 'completed' : ''}">
+                  <div class="telegram-question-header">
+                    <input
+                      type="checkbox"
+                      ${q.completed ? 'checked' : ''}
+                      onchange="window.handleTelegramToggle('${q.id}')"
+                    />
+                    <div class="telegram-question-content">
+                      <div class="telegram-question-text">${q.question_text}</div>
+                      ${q.source ? `<div class="telegram-question-source">📱 ${q.source}</div>` : ''}
+                      ${q.is_placeholder ? '<span class="placeholder-badge">Placeholder</span>' : ''}
+                    </div>
+                  </div>
+                  <div class="telegram-question-actions">
+                    <button class="btn btn--sm btn--secondary" onclick="window.editTelegramQuestion('${q.id}')">Edit</button>
+                    <button class="btn btn--sm btn--outline" onclick="window.deleteTelegramQuestionConfirm('${q.id}')">Delete</button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }).join('')}
+    `;
+    
+    showLoading(false);
+  } catch (error) {
+    console.error('Error loading telegram questions:', error);
+    showError('Failed to load telegram questions: ' + error.message);
+    showLoading(false);
+  }
 }
 
 // ==========================================================
@@ -843,7 +1526,242 @@ export function closeSettingsModal() {
 }
 
 export function showAddModuleModal() {
-  alert('Add module functionality coming soon!');
+  showInfo('Add module functionality coming soon!');
+}
+
+// ==========================================================
+// TASK CRUD FUNCTIONS
+// ==========================================================
+
+// Show Add Task Modal
+export async function showAddTaskModal() {
+  const modal = document.getElementById('addTaskModal');
+  const viewingDate = getViewingDate();
+  const dateStr = formatDateISO(viewingDate);
+  
+  document.getElementById('taskModalTitle').textContent = 'Add Task';
+  document.getElementById('taskEditId').value = '';
+  document.getElementById('taskCategoryId').value = '';
+  document.getElementById('taskDate').value = dateStr;
+  document.getElementById('taskName').value = '';
+  document.getElementById('taskTime').value = '';
+  document.getElementById('taskWorkSuitable').checked = false;
+  
+  // Populate category dropdown with existing categories for this date
+  const categories = getTasksForDate(dateStr);
+  const categorySelect = document.getElementById('taskCategorySelect');
+  categorySelect.innerHTML = `
+    <option value="">Select category...</option>
+    <option value="__new__">+ Create New Category</option>
+    ${categories.map(cat => `<option value="${cat.id}">${cat.category_name}</option>`).join('')}
+  `;
+  
+  // Populate module dropdown
+  const modules = getModules();
+  const moduleSelect = document.getElementById('taskModule');
+  moduleSelect.innerHTML = `
+    <option value="">Select module...</option>
+    ${modules.map(mod => `<option value="${mod.id}">${mod.name}</option>`).join('')}
+  `;
+  
+  // Hide new category fields initially
+  document.getElementById('newCategoryGroup').style.display = 'none';
+  document.getElementById('categoryTimeGroup').style.display = 'none';
+  
+  // Setup category select change handler
+  categorySelect.onchange = () => {
+    const isNewCategory = categorySelect.value === '__new__';
+    document.getElementById('newCategoryGroup').style.display = isNewCategory ? 'block' : 'none';
+    document.getElementById('categoryTimeGroup').style.display = isNewCategory ? 'block' : 'none';
+  };
+  
+  modal.style.display = 'flex';
+  
+  // Setup form submission
+  const form = document.getElementById('taskForm');
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    await saveTask();
+  };
+}
+
+// Close Task Modal
+export function closeTaskModal() {
+  document.getElementById('addTaskModal').style.display = 'none';
+}
+
+// Save Task (create or update)
+export async function saveTask() {
+  const editId = document.getElementById('taskEditId').value;
+  const categorySelect = document.getElementById('taskCategorySelect');
+  const categoryId = categorySelect.value;
+  const date = document.getElementById('taskDate').value;
+  const taskName = document.getElementById('taskName').value.trim();
+  const taskTime = document.getElementById('taskTime').value.trim();
+  const moduleId = document.getElementById('taskModule').value || null;
+  const workSuitable = document.getElementById('taskWorkSuitable').checked;
+  
+  // Validation
+  if (!date || !taskName || !taskTime) {
+    showError('Date, task name, and time estimate are required');
+    return;
+  }
+  
+  if (!categoryId) {
+    showError('Please select a category');
+    return;
+  }
+  
+  const currentUser = getCurrentUser();
+  
+  try {
+    showLoading(true);
+    
+    let finalCategoryId = categoryId;
+    
+    // Create new category if needed
+    if (categoryId === '__new__') {
+      const newCategoryName = document.getElementById('newCategoryName').value.trim();
+      const newCategoryTime = document.getElementById('newCategoryTime').value.trim();
+      
+      if (!newCategoryName || !newCategoryTime) {
+        showError('New category name and time estimate are required');
+        showLoading(false);
+        return;
+      }
+      
+      const newCategory = await createTaskCategory(currentUser.id, {
+        date,
+        category_name: newCategoryName,
+        time_estimate: newCategoryTime,
+        sort_order: 0
+      });
+      
+      finalCategoryId = newCategory.id;
+    }
+    
+    if (editId) {
+      // Update existing task
+      await updateTask(editId, {
+        category_id: finalCategoryId,
+        module_id: moduleId,
+        date,
+        task_name: taskName,
+        time_estimate: taskTime,
+        work_suitable: workSuitable
+      });
+      showSuccess('Task updated successfully!');
+    } else {
+      // Create new task
+      await createTask(currentUser.id, {
+        category_id: finalCategoryId,
+        module_id: moduleId,
+        date,
+        task_name: taskName,
+        time_estimate: taskTime,
+        work_suitable: workSuitable
+      });
+      showSuccess('Task added successfully!');
+    }
+    
+    closeTaskModal();
+    
+    // Reload tasks for the date
+    await loadTasksForDateHandler(new Date(date));
+    renderDailyView();
+    updateHeaderStats();
+    showLoading(false);
+  } catch (error) {
+    console.error('Error saving task:', error);
+    showError('Failed to save task: ' + error.message);
+    showLoading(false);
+  }
+}
+
+// Edit Task
+export async function editTask(taskId) {
+  try {
+    // Load task data
+    const { data: task, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('id', taskId)
+      .single();
+    
+    if (error) throw error;
+    
+    if (!task) {
+      showError('Task not found');
+      return;
+    }
+    
+    const modal = document.getElementById('addTaskModal');
+    document.getElementById('taskModalTitle').textContent = 'Edit Task';
+    document.getElementById('taskEditId').value = task.id;
+    document.getElementById('taskCategoryId').value = task.category_id;
+    document.getElementById('taskDate').value = task.date;
+    document.getElementById('taskName').value = task.task_name;
+    document.getElementById('taskTime').value = task.time_estimate;
+    document.getElementById('taskWorkSuitable').checked = task.work_suitable;
+    
+    // Populate category dropdown
+    const categories = getTasksForDate(task.date);
+    const categorySelect = document.getElementById('taskCategorySelect');
+    categorySelect.innerHTML = `
+      <option value="">Select category...</option>
+      <option value="__new__">+ Create New Category</option>
+      ${categories.map(cat => `<option value="${cat.id}" ${cat.id === task.category_id ? 'selected' : ''}>${cat.category_name}</option>`).join('')}
+    `;
+    
+    // Populate module dropdown
+    const modules = getModules();
+    const moduleSelect = document.getElementById('taskModule');
+    moduleSelect.innerHTML = `
+      <option value="">Select module...</option>
+      ${modules.map(mod => `<option value="${mod.id}" ${mod.id === task.module_id ? 'selected' : ''}>${mod.name}</option>`).join('')}
+    `;
+    
+    // Hide new category fields
+    document.getElementById('newCategoryGroup').style.display = 'none';
+    document.getElementById('categoryTimeGroup').style.display = 'none';
+    
+    // Setup category select change handler
+    categorySelect.onchange = () => {
+      const isNewCategory = categorySelect.value === '__new__';
+      document.getElementById('newCategoryGroup').style.display = isNewCategory ? 'block' : 'none';
+      document.getElementById('categoryTimeGroup').style.display = isNewCategory ? 'block' : 'none';
+    };
+    
+    modal.style.display = 'flex';
+    
+    // Setup form submission
+    const form = document.getElementById('taskForm');
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      await saveTask();
+    };
+  } catch (error) {
+    console.error('Error loading task:', error);
+    showError('Failed to load task: ' + error.message);
+  }
+}
+
+// Delete Task with confirmation
+export async function deleteTaskConfirm(taskId) {
+  showConfirm('Are you sure you want to delete this task?', async () => {
+    try {
+      showLoading(true);
+      await deleteTask(taskId);
+      await loadTasksForDateHandler(getViewingDate());
+      renderDailyView();
+      updateHeaderStats();
+      showSuccess('Task deleted successfully!');
+      showLoading(false);
+    } catch (error) {
+      showError('Failed to delete task: ' + error.message);
+      showLoading(false);
+    }
+  });
 }
 
 // Day Type Editor
@@ -913,10 +1831,10 @@ export async function saveDayType(dateStr) {
     
     closeDayTypeEditor();
     renderDailyView();
-    alert('Day type updated successfully!');
+    showSuccess('Day type updated successfully!');
   } catch (error) {
     console.error('Error saving day type:', error);
-    alert('Failed to save day type: ' + error.message);
+    showError('Failed to save day type: ' + error.message);
   }
 }
 
@@ -977,43 +1895,39 @@ export async function handleTelegramToggle(id) {
 }
 
 export async function deleteSBAScheduleEntryConfirm(id) {
-  if (confirm('Are you sure you want to delete this SBA schedule entry?')) {
+  showConfirm('Are you sure you want to delete this SBA schedule entry?', async () => {
     try {
       await deleteSBAScheduleEntry(id);
       await loadTasksForDateHandler(getViewingDate());
       renderDailyView();
       await updateSBAHeaderStatsHandler();
-      alert('SBA schedule entry deleted successfully!');
+      showSuccess('SBA schedule entry deleted successfully!');
     } catch (error) {
-      alert('Failed to delete SBA schedule entry: ' + error.message);
+      showError('Failed to delete SBA schedule entry: ' + error.message);
     }
-  }
+  });
 }
 
 export async function deleteTelegramQuestionConfirm(id) {
-  if (confirm('Are you sure you want to delete this telegram question?')) {
+  showConfirm('Are you sure you want to delete this telegram question?', async () => {
     try {
       await deleteTelegramQuestion(id);
       await loadTasksForDateHandler(getViewingDate());
       renderDailyView();
       await updateTelegramHeaderStatsHandler();
-      alert('Telegram question deleted successfully!');
+      showSuccess('Telegram question deleted successfully!');
     } catch (error) {
-      alert('Failed to delete telegram question: ' + error.message);
+      showError('Failed to delete telegram question: ' + error.message);
     }
-  }
+  });
 }
 
 export async function editSBAScheduleEntry(id) {
-  const newName = prompt('Edit SBA test name:');
-  if (newName) {
-    // Implementation would update the entry
-    alert('SBA editing not yet fully implemented in modular version');
-  }
+  showInfo('SBA editing not yet fully implemented - coming soon!');
 }
 
 export async function editTelegramQuestionFromDaily(id) {
-  alert('Telegram question editing not yet fully implemented in modular version');
+  await editTelegramQuestion(id);
 }
 
 // Load all user data helper
