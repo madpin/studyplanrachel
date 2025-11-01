@@ -1,8 +1,3 @@
-/**
- * Main Application Entry Point
- * Coordinates all modules and manages application lifecycle
- */
-
 // Import configuration and authentication
 import { supabase } from './config.js';
 import {
@@ -60,22 +55,12 @@ import * as UI from './modules/ui.js';
 // Import toast notifications
 import { showToast, showSuccess, showError, showWarning, showConfirm } from './modules/toast.js';
 
-// ==========================================================
-// GLOBAL STATE
-// ==========================================================
-
 let hasInitialized = false;
 
-// ==========================================================
-// THEME MANAGEMENT
-// ==========================================================
-
 function initializeTheme() {
-  // Load theme from localStorage or default to 'ocean'
   const savedTheme = localStorage.getItem('studyplan-theme') || 'ocean';
   applyTheme(savedTheme);
   
-  // Setup theme toggle
   const themeToggle = document.getElementById('themeToggle');
   const themeMenu = document.getElementById('themeMenu');
   
@@ -85,14 +70,12 @@ function initializeTheme() {
       themeMenu.style.display = themeMenu.style.display === 'none' ? 'block' : 'none';
     });
     
-    // Close theme menu when clicking outside
     document.addEventListener('click', (e) => {
       if (!themeToggle.contains(e.target) && !themeMenu.contains(e.target)) {
         themeMenu.style.display = 'none';
       }
     });
     
-    // Theme option handlers
     document.querySelectorAll('.theme-option').forEach(option => {
       option.addEventListener('click', () => {
         const theme = option.dataset.theme;
@@ -105,78 +88,46 @@ function initializeTheme() {
 }
 
 function applyTheme(theme) {
-  // Set data-theme attribute on html element for broader scope
   document.documentElement.setAttribute('data-theme', theme);
   document.body.setAttribute('data-theme', theme);
   
-  // Update active state in theme menu
   document.querySelectorAll('.theme-option').forEach(option => {
-    if (option.dataset.theme === theme) {
-      option.classList.add('active');
-    } else {
-      option.classList.remove('active');
-    }
+    option.classList.toggle('active', option.dataset.theme === theme);
   });
-  
-  console.log('Theme applied:', theme);
 }
-
-// ==========================================================
-// INITIALIZATION
-// ==========================================================
 
 async function initializeApp() {
   try {
-    console.log('Step 1: Showing loading indicator');
     UI.showLoading(true);
-
-    console.log('Step 2: Checking for user settings...');
     const currentUser = getCurrentUser();
-    console.log('Current user ID:', currentUser.id);
-
-    // Check if user has settings (first-time user check)
     const settings = await loadUserSettings(currentUser.id);
 
     if (!settings) {
-      // First-time user - show onboarding
-      console.log('Step 3: First-time user detected, showing onboarding...');
       UI.showLoading(false);
       showOnboardingModal();
       return;
     }
 
-    console.log('Step 3: Existing user, loading settings');
     setUserSettings(settings);
-
-    console.log('Step 4: Loading all user data...');
     await loadAllData();
-
-    console.log('Step 5: Updating UI...');
     UI.updateHeaderStats();
     UI.updateMotivationalBanner();
     UI.updateCatchUpQueue();
     
-    // Restore last view and date from localStorage
     const lastView = localStorage.getItem('studyplan-last-view') || 'daily';
     const lastDate = localStorage.getItem('studyplan-last-date');
     
     if (lastDate) {
       const restoredDate = new Date(lastDate);
-      // Only restore if date is valid
       if (!isNaN(restoredDate.getTime())) {
         setViewingDate(restoredDate);
         await loadTasksForDateHandler(restoredDate);
       }
     }
     
-    // Switch to last active view (this will render it and make it visible)
     await UI.switchView(lastView);
-    
-    console.log('Step 6: Loading daily note...');
     await loadDailyNoteHandler();
-
     UI.showLoading(false);
-    console.log('App initialization complete!');
 
   } catch (error) {
     console.error('Error initializing app:', error);
@@ -185,21 +136,16 @@ async function initializeApp() {
   }
 }
 
-// Load all user data
 async function loadAllData() {
   const currentUser = getCurrentUser();
   
   try {
-    // Load modules
     const modules = await loadModules(currentUser.id);
     setModules(modules);
 
-    // Load daily schedule
     const scheduleMap = await loadDailySchedule(currentUser.id);
     
-    // If no schedule in database, use template
     if (Object.keys(scheduleMap).length === 0) {
-      console.log('No schedule in database, using template');
       Object.keys(templateDetailedSchedule).forEach(date => {
         setDailySchedule({ ...appState.dailySchedule, [date]: templateDetailedSchedule[date] });
       });
@@ -207,27 +153,21 @@ async function loadAllData() {
       setDailySchedule(scheduleMap);
     }
 
-    // Load ALL tasks up to today for accurate progress calculation
     const allTasksToToday = await loadAllTasksToToday(currentUser.id);
-    // Store in appState for progress calculation
     Object.keys(allTasksToToday).forEach(dateStr => {
       setTasks({ ...appState.tasks, [dateStr]: allTasksToToday[dateStr] });
     });
 
-    // Load tasks for current date (may already be loaded above)
     const viewingDate = new Date();
     const dateStr = formatDateISO(viewingDate);
     if (!appState.tasks[dateStr]) {
       const categories = await loadTasksForDate(currentUser.id, viewingDate);
-      console.log('Loaded tasks for', dateStr, ':', categories);
       setTasks({ ...appState.tasks, [dateStr]: categories });
     }
 
-    // Load catch-up queue
     const catchUpQueue = await loadCatchUpQueue(currentUser.id);
     setCatchUpQueue(catchUpQueue);
 
-    // Load SBA and Telegram for current date
     const { data: sbaEntries } = await supabase
       .from('sba_schedule')
       .select('*')
@@ -249,7 +189,6 @@ async function loadAllData() {
   }
 }
 
-// Load daily note
 async function loadDailyNoteHandler() {
   const currentUser = getCurrentUser();
   const viewingDate = appState.viewingDate;
@@ -264,10 +203,7 @@ async function loadDailyNoteHandler() {
   }
 }
 
-// Debounce timer for autosave
 let notesAutosaveTimer = null;
-
-// Save daily note
 async function saveDailyNoteHandler(showFeedback = true) {
   const currentUser = getCurrentUser();
   const viewingDate = appState.viewingDate;
@@ -279,7 +215,6 @@ async function saveDailyNoteHandler(showFeedback = true) {
     setDailyNoteForDate(dateStr, notes);
     
     if (showFeedback) {
-      // Show save confirmation
       const saveBtn = document.getElementById('saveNotesBtn');
       const saveStatus = document.getElementById('notesSaveStatus');
       const originalText = saveBtn.textContent;
@@ -303,27 +238,20 @@ async function saveDailyNoteHandler(showFeedback = true) {
   }
 }
 
-// Autosave notes with debounce
 function setupNotesAutosave() {
   const notesTextarea = document.getElementById('dailyNotes');
   if (!notesTextarea) return;
   
   notesTextarea.addEventListener('input', () => {
-    // Clear existing timer
     if (notesAutosaveTimer) {
       clearTimeout(notesAutosaveTimer);
     }
     
-    // Set new timer for 800ms
     notesAutosaveTimer = setTimeout(() => {
-      saveDailyNoteHandler(false); // false = no visual feedback for autosave
+      saveDailyNoteHandler(false);
     }, 800);
   });
 }
-
-// ==========================================================
-// ONBOARDING
-// ==========================================================
 
 function showOnboardingModal() {
   const modal = document.getElementById('onboardingModal');
@@ -332,12 +260,10 @@ function showOnboardingModal() {
     return;
   }
 
-  // Set default values
   document.getElementById('onboardingExamDate').value = '2026-01-14';
   document.getElementById('onboardingTripStart').value = '2025-12-19';
   document.getElementById('onboardingTripEnd').value = '2025-12-29';
 
-  // Select all modules by default
   const modulesContainer = document.getElementById('moduleCheckboxes');
   modulesContainer.innerHTML = defaultModules.map((module, index) => `
     <label class="module-checkbox">
@@ -381,7 +307,6 @@ async function submitOnboarding(useTemplate) {
       tripStart = document.getElementById('onboardingTripStart').value || null;
       tripEnd = document.getElementById('onboardingTripEnd').value || null;
 
-      // Get selected modules
       const checkboxes = document.querySelectorAll('#moduleCheckboxes input[type="checkbox"]:checked');
       selectedModules = Array.from(checkboxes).map(cb => defaultModules[parseInt(cb.value)]);
 
@@ -394,39 +319,17 @@ async function submitOnboarding(useTemplate) {
     UI.showLoading(true);
     closeOnboardingModal();
 
-    // Complete onboarding (will skip if already exists)
     await completeOnboarding(currentUser.id, examDate, tripStart, tripEnd, selectedModules, useTemplate);
 
-    // Seed daily schedule if using template
     if (useTemplate) {
-      console.log('🎯 useTemplate is TRUE - starting seeding process...');
-      
-      console.log('Seeding daily schedule...');
       await seedDailySchedule(currentUser.id, templateDetailedSchedule);
-      console.log('Daily schedule seeded');
-      
-      // Seed SBA schedule from template
-      console.log('Seeding SBA schedule from template...');
       const sbaCount = await seedSBASchedule(currentUser.id, templateSBASchedule);
-      console.log(`SBA schedule seeded successfully: ${sbaCount} entries`);
-      
-      // Seed Telegram questions from template
-      console.log('Seeding Telegram questions from template...');
       const telegramCount = await seedTelegramQuestions(currentUser.id, templateDetailedSchedule);
-      console.log(`Telegram questions seeded successfully: ${telegramCount} entries`);
-      
-      // Seed tasks from template schedule (will skip existing days)
-      console.log('Seeding tasks from template...');
       const modules = await loadModules(currentUser.id);
       const taskCount = await seedTasksFromTemplate(currentUser.id, templateDetailedSchedule, modules);
-      console.log(`Tasks seeded successfully: ${taskCount} tasks`);
-    } else {
-      console.log('⚠️ useTemplate is FALSE - skipping seeding');
     }
 
-    // Reload app with new data
     await initializeApp();
-
     UI.showLoading(false);
     showSuccess('Welcome! Your study plan has been set up successfully!');
 
@@ -437,25 +340,18 @@ async function submitOnboarding(useTemplate) {
   }
 }
 
-// Function to manually trigger onboarding (useful for re-seeding)
 function showOnboardingManually() {
   showOnboardingModal();
 }
 
-// ==========================================================
-// KEYBOARD SHORTCUTS
-// ==========================================================
-
 function setupKeyboardShortcuts() {
   document.addEventListener('keydown', (e) => {
-    // Don't trigger shortcuts when typing in input fields
     const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
     
     if (isTyping && e.key !== 'Escape') {
       return;
     }
     
-    // Escape key - close any open modals
     if (e.key === 'Escape') {
       const openModals = document.querySelectorAll('.modal[style*="display: flex"]');
       openModals.forEach(modal => {
@@ -464,61 +360,59 @@ function setupKeyboardShortcuts() {
       return;
     }
     
-    // Don't proceed if modifier keys are pressed (except for shortcuts that use them)
     if (e.ctrlKey || e.metaKey || e.altKey) {
       return;
     }
     
-    // Navigation shortcuts
     switch(e.key) {
-      case 'n': // Next day
+      case 'n':
       case 'ArrowRight':
         e.preventDefault();
         UI.changeDay(1);
         break;
         
-      case 'p': // Previous day
+      case 'p':
       case 'ArrowLeft':
         e.preventDefault();
         UI.changeDay(-1);
         break;
         
-      case '1': // Daily view
+      case '1':
         e.preventDefault();
         UI.switchView('daily');
         break;
         
-      case '2': // Weekly view
+      case '2':
         e.preventDefault();
         UI.switchView('weekly');
         break;
         
-      case '3': // Calendar view
+      case '3':
         e.preventDefault();
         UI.switchView('calendar');
         break;
         
-      case '4': // Modules view
+      case '4':
         e.preventDefault();
         UI.switchView('modules');
         break;
         
-      case '5': // SBA view
+      case '5':
         e.preventDefault();
         UI.switchView('sba');
         break;
         
-      case '6': // Telegram view
+      case '6':
         e.preventDefault();
         UI.switchView('telegram');
         break;
         
-      case '?': // Show shortcuts help
+      case '?':
         e.preventDefault();
         showKeyboardShortcutsHelp();
         break;
         
-      case 'a': // Add task (only in daily view)
+      case 'a':
         if (document.getElementById('dailyView').style.display !== 'none') {
           e.preventDefault();
           UI.showAddTaskModal();
@@ -564,75 +458,54 @@ function showKeyboardShortcutsHelp() {
   document.body.appendChild(modal);
 }
 
-// ==========================================================
-// EVENT LISTENERS SETUP
-// ==========================================================
-
 function setupEventListeners() {
-  // Save notes button
   const saveNotesBtn = document.getElementById('saveNotesBtn');
   if (saveNotesBtn) {
     saveNotesBtn.addEventListener('click', () => saveDailyNoteHandler(true));
   }
   
-  // Setup notes autosave
   setupNotesAutosave();
 
-  // Tab buttons
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       UI.switchView(btn.dataset.view);
     });
   });
 
-  // Daily view navigation
   const prevDayBtn = document.getElementById('prevDay');
   const nextDayBtn = document.getElementById('nextDay');
   if (prevDayBtn) prevDayBtn.addEventListener('click', () => UI.changeDay(-1));
   if (nextDayBtn) nextDayBtn.addEventListener('click', () => UI.changeDay(1));
 
-  // Weekly view navigation
   const prevWeekBtn = document.getElementById('prevWeek');
   const nextWeekBtn = document.getElementById('nextWeek');
   if (prevWeekBtn) prevWeekBtn.addEventListener('click', () => UI.changeWeek(-1));
   if (nextWeekBtn) nextWeekBtn.addEventListener('click', () => UI.changeWeek(1));
 
-  // Calendar view navigation
   const prevMonthBtn = document.getElementById('prevMonth');
   const nextMonthBtn = document.getElementById('nextMonth');
   if (prevMonthBtn) prevMonthBtn.addEventListener('click', () => UI.changeMonth(-1));
   if (nextMonthBtn) nextMonthBtn.addEventListener('click', () => UI.changeMonth(1));
 
-  // Settings button
   const settingsBtn = document.getElementById('settingsBtn');
   if (settingsBtn) settingsBtn.addEventListener('click', UI.showSettingsModal);
 
-  // Logout button
   const logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
 
-  // Catch-up queue toggle
   const toggleCatchUpBtn = document.getElementById('toggleCatchUpBtn');
   if (toggleCatchUpBtn) toggleCatchUpBtn.addEventListener('click', UI.toggleCatchUpQueue);
 
-  // Add module button
   const addModuleBtn = document.getElementById('addModuleBtn');
   if (addModuleBtn) addModuleBtn.addEventListener('click', UI.showAddModuleModal);
 
-  // Onboarding buttons
   const useTemplateBtn = document.getElementById('useTemplateBtn');
   const customizeBtn = document.getElementById('customizeBtn');
   if (useTemplateBtn) useTemplateBtn.addEventListener('click', () => submitOnboarding(true));
   if (customizeBtn) customizeBtn.addEventListener('click', () => submitOnboarding(false));
-
-  console.log('Event listeners setup complete');
 }
 
-// ==========================================================
-// EXPOSE FUNCTIONS TO WINDOW FOR ONCLICK HANDLERS
-// ==========================================================
-
-// Expose UI functions to window for onclick handlers in HTML
+// Expose UI functions to window for onclick handlers
 window.switchView = UI.switchView;
 window.changeDay = UI.changeDay;
 window.changeWeek = UI.changeWeek;
@@ -717,7 +590,7 @@ async function loadTasksForDateHandler(date) {
   return await UI.loadTasksForDateHandler(date);
 }
 
-// Placeholder functions for features not yet fully implemented in modular version
+// Placeholder functions for features
 window.showAddSBAModal = () => UI.showAddSBAModal();
 window.showSBABulkUploadModal = () => UI.showSBABulkUploadModal();
 window.showSBAPlaceholderModal = () => UI.showSBAPlaceholderModal();
@@ -730,20 +603,13 @@ window.closeTelegramModal = UI.closeTelegramModal;
 window.saveTelegramQuestion = UI.saveTelegramQuestion;
 window.editTelegramQuestion = UI.editTelegramQuestion;
 
-// ==========================================================
-// APP INITIALIZATION
-// ==========================================================
-
 // Set the initialization callback for auth module
 setInitializeAppCallback(initializeApp);
 
 // Initialize auth system when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('DOM Content Loaded - Setting up app...');
   initializeTheme();
   setupEventListeners();
   setupKeyboardShortcuts();
   initializeAuth();
 });
-
-console.log('App module loaded successfully');

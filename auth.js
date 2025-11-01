@@ -1,14 +1,6 @@
-/**
- * Authentication Module
- * Handles user authentication, login, signup, and auth state management
- */
-
 import { supabase } from './config.js';
 
-// Current user state
 let currentUser = null;
-
-// Getter and setter for currentUser
 export function getCurrentUser() {
   return currentUser;
 }
@@ -17,7 +9,6 @@ export function setCurrentUser(user) {
   currentUser = user;
 }
 
-// Switch between login and signup tabs
 export function switchAuthTab(tab) {
   const loginTab = document.getElementById('loginTab');
   const signupTab = document.getElementById('signupTab');
@@ -36,13 +27,11 @@ export function switchAuthTab(tab) {
     loginForm.style.display = 'none';
   }
 
-  // Clear error messages
   document.getElementById('loginError').textContent = '';
   document.getElementById('signupError').textContent = '';
   document.getElementById('signupSuccess').textContent = '';
 }
 
-// Logout handler
 export async function handleLogout() {
   try {
     const { error } = await supabase.auth.signOut();
@@ -57,12 +46,10 @@ export async function handleLogout() {
   }
 }
 
-// Show/hide screens
 export function showAuthScreen() {
   document.getElementById('authScreen').style.display = 'flex';
   document.getElementById('mainApp').style.display = 'none';
 
-  // Clear forms
   document.getElementById('loginForm').reset();
   document.getElementById('signupForm').reset();
   document.getElementById('loginError').textContent = '';
@@ -75,11 +62,9 @@ export function showMainApp() {
   document.getElementById('mainApp').style.display = 'block';
 }
 
-// Flag to prevent duplicate initialization
 let isInitializing = false;
 let hasInitialized = false;
 
-// This will be set by app.js when it imports this module
 let initializeAppCallback = null;
 
 export function setInitializeAppCallback(callback) {
@@ -88,34 +73,28 @@ export function setInitializeAppCallback(callback) {
 
 export async function beginInitializationIfNeeded() {
   if (isInitializing || hasInitialized) {
-    console.log('Initialization skipped (isInitializing or hasInitialized)');
     return;
   }
   isInitializing = true;
   try {
-    console.log('Starting app initialization...');
     if (initializeAppCallback) {
       await initializeAppCallback();
     } else {
       console.error('initializeAppCallback not set!');
       throw new Error('initializeAppCallback not set!');
     }
-    console.log('App initialized successfully');
     showMainApp();
     hasInitialized = true;
   } catch (error) {
     console.error('Failed to initialize app:', error);
     alert('Failed to load app: ' + error.message + '\n\nCheck console for details.');
-    // Reset flag so user can try again
     hasInitialized = false;
   } finally {
     isInitializing = false;
   }
 }
 
-// Initialize auth listeners and form handlers
 export function initializeAuth() {
-  // Login handler
   document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -142,7 +121,6 @@ export function initializeAuth() {
     }
   });
 
-  // Signup handler
   document.getElementById('signupForm').addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -171,7 +149,6 @@ export function initializeAuth() {
 
       if (error) throw error;
 
-      // Check if email confirmation is required
       if (data.user && data.user.identities && data.user.identities.length === 0) {
         errorDiv.textContent = 'An account with this email already exists.';
         return;
@@ -179,10 +156,8 @@ export function initializeAuth() {
 
       successDiv.textContent = 'Account created successfully! You can now login.';
 
-      // Clear form
       document.getElementById('signupForm').reset();
 
-      // Switch to login tab after 2 seconds
       setTimeout(() => {
         switchAuthTab('login');
       }, 2000);
@@ -193,29 +168,16 @@ export function initializeAuth() {
     }
   });
 
-  // Check if user is already logged in on page load
   supabase.auth.onAuthStateChange(async (event, session) => {
-    console.log('Auth state changed:', event, 'Session exists:', !!session);
-
     if (session && session.user) {
       currentUser = session.user;
-      console.log('User authenticated:', currentUser.email);
       
-      // Only initialize on INITIAL_SESSION to avoid race conditions
-      // SIGNED_IN fires too early when the session isn't fully established
       if (event === 'INITIAL_SESSION') {
-        console.log('INITIAL_SESSION detected, resetting hasInitialized flag');
         hasInitialized = false;
         
-        // On page refresh, defer initialization to next tick to ensure Supabase is fully ready
-        // This prevents database queries from hanging
         setTimeout(() => {
-          console.log('Deferred initialization starting...');
           beginInitializationIfNeeded();
         }, 250);
-      } else if (event === 'SIGNED_IN') {
-        console.log('SIGNED_IN detected, skipping initialization (will be handled by INITIAL_SESSION)');
-        // Don't initialize on SIGNED_IN - INITIAL_SESSION will follow immediately
       }
     } else {
       currentUser = null;
