@@ -92,8 +92,8 @@ async function initializeApp() {
     UI.updateMotivationalBanner();
     UI.updateCatchUpQueue();
     
-    // Render initial daily view
-    await UI.renderDailyView();
+    // Switch to daily view (this will render it and make it visible)
+    await UI.switchView('daily');
     
     console.log('Step 6: Loading daily note...');
     await loadDailyNoteHandler();
@@ -134,6 +134,7 @@ async function loadAllData() {
     const viewingDate = new Date();
     const categories = await loadTasksForDate(currentUser.id, viewingDate);
     const dateStr = formatDateISO(viewingDate);
+    console.log('Loaded tasks for', dateStr, ':', categories);
     setTasks({ ...appState.tasks, [dateStr]: categories });
 
     // Load catch-up queue

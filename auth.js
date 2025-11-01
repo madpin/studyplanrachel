@@ -98,6 +98,7 @@ export async function beginInitializationIfNeeded() {
       await initializeAppCallback();
     } else {
       console.error('initializeAppCallback not set!');
+      throw new Error('initializeAppCallback not set!');
     }
     console.log('App initialized successfully');
     showMainApp();
@@ -105,6 +106,8 @@ export async function beginInitializationIfNeeded() {
   } catch (error) {
     console.error('Failed to initialize app:', error);
     alert('Failed to load app: ' + error.message + '\n\nCheck console for details.');
+    // Reset flag so user can try again
+    hasInitialized = false;
   } finally {
     isInitializing = false;
   }
@@ -192,12 +195,28 @@ export function initializeAuth() {
 
   // Check if user is already logged in on page load
   supabase.auth.onAuthStateChange(async (event, session) => {
-    console.log('Auth state changed:', event);
+    console.log('Auth state changed:', event, 'Session exists:', !!session);
 
     if (session && session.user) {
       currentUser = session.user;
       console.log('User authenticated:', currentUser.email);
-      await beginInitializationIfNeeded();
+      
+      // Only initialize on INITIAL_SESSION to avoid race conditions
+      // SIGNED_IN fires too early when the session isn't fully established
+      if (event === 'INITIAL_SESSION') {
+        console.log('INITIAL_SESSION detected, resetting hasInitialized flag');
+        hasInitialized = false;
+        
+        // On page refresh, defer initialization to next tick to ensure Supabase is fully ready
+        // This prevents database queries from hanging
+        setTimeout(() => {
+          console.log('Deferred initialization starting...');
+          beginInitializationIfNeeded();
+        }, 250);
+      } else if (event === 'SIGNED_IN') {
+        console.log('SIGNED_IN detected, skipping initialization (will be handled by INITIAL_SESSION)');
+        // Don't initialize on SIGNED_IN - INITIAL_SESSION will follow immediately
+      }
     } else {
       currentUser = null;
       hasInitialized = false;

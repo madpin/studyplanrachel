@@ -200,6 +200,8 @@ export async function switchView(viewName) {
 export function renderDailyView() {
   const date = getViewingDate();
   const dateStr = formatDateISO(date);
+  
+  console.log('[renderDailyView] Rendering for date:', dateStr);
 
   document.getElementById('currentDate').textContent = formatDate(date);
 
@@ -253,6 +255,10 @@ export function renderDailyView() {
   const sbaEntries = getSBAForDate(dateStr);
   const telegramQuestions = getTelegramQuestionsForDate(dateStr);
   const dailyContent = document.getElementById('dailyContent');
+  
+  console.log('[renderDailyView] Tasks:', categories);
+  console.log('[renderDailyView] SBA:', sbaEntries);
+  console.log('[renderDailyView] Telegram:', telegramQuestions);
 
   let html = '';
 
@@ -385,7 +391,11 @@ export function renderDailyView() {
     `;
   }
 
+  console.log('[renderDailyView] Generated HTML length:', html.length);
+  console.log('[renderDailyView] First 200 chars of HTML:', html.substring(0, 200));
+  console.log('[renderDailyView] dailyContent element:', dailyContent);
   dailyContent.innerHTML = html;
+  console.log('[renderDailyView] HTML set to DOM, dailyContent.children.length:', dailyContent.children.length);
 
   // Auto-expand all categories on initial render
   setTimeout(() => {
